@@ -276,6 +276,34 @@ app.get('/api/geocode', isAuthenticated, async (req, res) => {
   }
 });
 
+// ===== BÚSQUEDA PREDICTIVA DE LUGARES =====
+app.get('/api/search-places', isAuthenticated, async (req, res) => {
+  const { query } = req.query;
+  if (!query || query.length < 2) return res.json([]);
+  try {
+    const response = await axios.get('https://nominatim.openstreetmap.org/search', {
+      params: {
+        q: query,
+        format: 'json',
+        limit: 5,
+        addressdetails: 1,
+        'accept-language': 'es'
+      },
+      headers: { 'User-Agent': 'CompartidosApp/1.0 (https://tudominio.com)' }
+    });
+    const results = response.data.map(item => ({
+      label: item.display_name,
+      lat: parseFloat(item.lat),
+      lng: parseFloat(item.lon),
+      display_name: item.display_name
+    }));
+    res.json(results);
+  } catch (err) {
+    console.error('Search places error:', err.message);
+    res.status(500).json({ error: 'Error al buscar lugares' });
+  }
+});
+
 // ===== UPLOAD DE IMÁGENES =====
 const storage = multer.memoryStorage();
 const upload = multer({
