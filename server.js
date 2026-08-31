@@ -6,6 +6,8 @@ const path = require('path');
 const multer = require('multer');
 const sharp = require('sharp');
 const fs = require('fs');
+const axios = require('axios');
+const cheerio = require('cheerio');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -163,7 +165,6 @@ app.put('/api/items/:id', isAuthenticated, (req, res) => {
 
 app.delete('/api/items/:id', isAuthenticated, (req, res) => {
   const { id } = req.params;
-  // Primero eliminar subitems (la DB lo hace en cascada, pero también eliminamos archivos de imagen)
   const subitems = db.prepare('SELECT * FROM subitems WHERE item_id = ?').all(id);
   subitems.forEach(sub => {
     if (sub.type === 'image' && sub.content) {
@@ -226,6 +227,49 @@ app.delete('/api/subitems/:id', isAuthenticated, (req, res) => {
   const stmt = db.prepare('DELETE FROM subitems WHERE id = ?');
   stmt.run(id);
   res.json({ success: true });
+});
+
+// ===== PREVIEW DE ENLACES =====
+app.get('/api/preview', isAuthenticated, async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: 'URL requerida' });
+  try {
+    const response = await axios.get(url, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const html = response.data;
+    const $ = cheerio.load(html);
+    const title = $('meta[property="og:title"]').attr('content') || $('title').text() || url;
+    const description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '';
+    const image = $('meta[property="og:image"]').attr('content') || '';
+    res.json({ title: title.trim(), description: description.trim(), image });
+  } catch (err) {
+    console.error('Error fetching preview:', err.message);
+    res.json({ title: url, description: '', image: '' });
+  }
+});
+
+// ===== GEOCODIFICACIÓN (OpenStreetMap Nominatim) =====
+app.get('/api/geocode', isAuthenticated, async (req, res) => {
+  const { address } = req.query;
+  if (!address) return res.status(400).json({ error: 'Dirección requerida' });
+  try {
+    const response = await axios.get('https://nominatim.openstreetmap.org/search', {
+      params: {
+        q: address,
+        format: 'json',
+        limit: 1
+      },
+      headers: { 'User-Agent': 'CompartidosApp/1.0 (https://tudominio.com)' }
+    });
+    if (response.data && response.data.length > 0) {
+      const { lat, lon, display_name } = response.data[0];
+      res.json({ lat: parseFloat(lat), lng: parseFloat(lon), display_name });
+    } else {
+      res.status(404).json({ error: 'No se encontró la ubicación' });
+    }
+  } catch (err) {
+    console.error('Geocoding error:', err.message);
+    res.status(500).json({ error: 'Error al geocodificar' });
+  }
 });
 
 // ===== UPLOAD DE IMÁGENES =====
