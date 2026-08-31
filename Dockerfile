@@ -9,20 +9,12 @@ RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Establece el directorio de trabajo
 WORKDIR /app
 
-# Copia los archivos de dependencias primero (para aprovechar caché)
 COPY package*.json ./
-
-# Instala dependencias (solo producción). Si no hay lockfile, usa npm install.
 RUN npm install --production
 
-# Copia el resto del código
 COPY . .
 
-# Expone el puerto (por defecto 3000, pero Coolify usará el de la variable PORT)
 EXPOSE 3000
-
-# Comando de inicio
 CMD ["node", "server.js"]
