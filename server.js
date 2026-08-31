@@ -12,8 +12,12 @@ const cheerio = require('cheerio');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configuración de la base de datos
-const db = new Database(path.join(__dirname, 'db', 'database.sqlite'));
+// --- Crear directorio para la base de datos si no existe ---
+const dbDir = path.join(__dirname, 'db');
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+const db = new Database(path.join(dbDir, 'database.sqlite'));
 
 // Asegurar carpeta de uploads
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -305,6 +309,6 @@ app.post('/api/upload', isAuthenticated, upload.single('image'), async (req, res
 });
 
 // Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Servidor corriendo en http://0.0.0.0:${PORT}`);
 });
