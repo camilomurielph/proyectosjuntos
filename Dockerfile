@@ -1,7 +1,5 @@
-# Usa Node.js 18 LTS con herramientas de compilación
 FROM node:18-slim
 
-# Instala Python, make, g++ y librerías de SQLite (necesarias para better-sqlite3)
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
