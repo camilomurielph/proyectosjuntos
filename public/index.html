@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  <title>Compartidos App</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- PANTALLA DE LOGIN -->
+  <div id="loginScreen" class="screen active">
+    <div class="login-container">
+      <h1>Compartidos</h1>
+      <p>Inicia sesión con tu cuenta</p>
+      <form id="loginForm">
+        <input type="text" id="username" placeholder="Usuario" required>
+        <input type="password" id="password" placeholder="Contraseña" required>
+        <button type="submit">Entrar</button>
+        <div id="loginError" class="error"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- PANTALLA PRINCIPAL -->
+  <div id="mainScreen" class="screen">
+    <header>
+      <h2 id="appTitle">Compartidos</h2>
+      <button id="logoutBtn" class="logout-btn">Cerrar sesión</button>
+    </header>
+
+    <main id="mainContent">
+      <!-- Aquí se renderiza la lista de items -->
+      <div id="itemsList"></div>
+    </main>
+
+    <!-- Navegación inferior -->
+    <nav id="bottomNav">
+      <button class="tab-btn active" data-type="mudanza">🏠 Mudanza</button>
+      <button class="tab-btn" data-type="restaurante">🍽️ Restaurantes</button>
+      <button class="tab-btn" data-type="cita">💕 Citas</button>
+      <button class="tab-btn" data-type="proyecto">🚀 Proyectos</button>
+    </nav>
+
+    <!-- Botón flotante para agregar -->
+    <button id="fab" class="fab">+</button>
+  </div>
+
+  <!-- MODAL PARA VER/EDITAR ITEM -->
+  <div id="itemModal" class="modal">
+    <div class="modal-content">
+      <header class="modal-header">
+        <h3 id="modalTitle">Detalle</h3>
+        <button id="closeModalBtn" class="close-btn">&times;</button>
+      </header>
+      <form id="itemForm">
+        <input type="hidden" id="itemId">
+        <input type="hidden" id="itemType">
+
+        <div class="form-group">
+          <label for="editTitle">Título</label>
+          <input type="text" id="editTitle" required>
+        </div>
+
+        <div class="form-group">
+          <label for="editDescription">Descripción</label>
+          <textarea id="editDescription" rows="3"></textarea>
+        </div>
+
+        <!-- Campos específicos según tipo se inyectan aquí -->
+        <div id="dynamicFields"></div>
+
+        <!-- Campos comunes: enlaces, imágenes, textos -->
+        <div class="form-group">
+          <label>Enlaces</label>
+          <div id="linksContainer"></div>
+          <button type="button" class="add-array-btn" data-target="links">+ Añadir enlace</button>
+        </div>
+
+        <div class="form-group">
+          <label>Imágenes (URLs)</label>
+          <div id="imagesContainer"></div>
+          <button type="button" class="add-array-btn" data-target="images">+ Añadir imagen</button>
+        </div>
+
+        <div class="form-group">
+          <label>Notas adicionales</label>
+          <div id="textsContainer"></div>
+          <button type="button" class="add-array-btn" data-target="texts">+ Añadir nota</button>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="save-btn">Guardar</button>
+          <button type="button" id="deleteItemBtn" class="delete-btn">Eliminar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
