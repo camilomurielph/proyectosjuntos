@@ -29,6 +29,12 @@
       <button id="logoutBtn" class="logout-btn">Cerrar sesión</button>
     </header>
 
+    <!-- FILTROS (solo visibles en Restaurantes) -->
+    <div id="filtersBar" style="display:none; padding: 0.5rem 1rem; background: #1e1e1e; border-bottom: 1px solid #333; gap: 0.5rem; flex-wrap: wrap;">
+      <button id="filterRating" class="filter-btn active" data-sort="rating">⭐ Mejor puntuación</button>
+      <button id="filterDistance" class="filter-btn" data-sort="distance">📍 Más cercano</button>
+    </div>
+
     <main id="mainContent">
       <div id="itemsList"></div>
     </main>
@@ -73,8 +79,17 @@
         </div>
       </div>
 
-      <!-- Lista de subitems -->
-      <div id="subitemsList" class="subitems-list"></div>
+      <!-- Puntuación con estrellas (solo para restaurantes) -->
+      <div id="ratingArea" style="display:none; margin-bottom: 1rem;">
+        <span style="font-weight: bold; color: #aaa;">Tu puntuación:</span>
+        <span id="starsContainer" style="font-size: 1.8rem; cursor: pointer; margin-left: 0.5rem;">
+          ☆☆☆☆☆
+        </span>
+        <span id="ratingInfo" style="font-size: 0.9rem; color: #888; margin-left: 0.5rem;"></span>
+      </div>
+
+      <!-- Lista de subitems en grid -->
+      <div id="subitemsList" class="subitems-grid"></div>
 
       <!-- Botones para añadir subitems -->
       <div class="add-subitem-buttons">
@@ -83,6 +98,13 @@
         <button id="addImageBtn" class="sub-add-btn">🖼️ Imagen</button>
         <button id="addLocationBtn" class="sub-add-btn" style="display:none;">📍 Ubicación</button>
         <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
+      </div>
+
+      <!-- Modal de autocompletado para ubicación -->
+      <div id="locationModal" style="display:none; background: #2a2a2a; padding: 0.8rem; border-radius: 8px; margin-bottom: 1rem;">
+        <input type="text" id="locationSearchInput" placeholder="Escribe una dirección..." style="width:100%; padding:0.5rem; background:#1e1e1e; color:#e0e0e0; border:1px solid #444; border-radius:4px;">
+        <div id="locationSuggestions" style="margin-top:0.5rem; max-height:150px; overflow-y:auto;"></div>
+        <button id="cancelLocationBtn" class="cancel-btn small" style="margin-top:0.5rem;">Cancelar</button>
       </div>
 
       <!-- Eliminar item -->
