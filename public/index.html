@@ -30,11 +30,9 @@
     </header>
 
     <main id="mainContent">
-      <!-- Aquí se renderiza la lista de items -->
       <div id="itemsList"></div>
     </main>
 
-    <!-- Navegación inferior -->
     <nav id="bottomNav">
       <button class="tab-btn active" data-type="mudanza">🏠 Mudanza</button>
       <button class="tab-btn" data-type="restaurante">🍽️ Restaurantes</button>
@@ -42,58 +40,52 @@
       <button class="tab-btn" data-type="proyecto">🚀 Proyectos</button>
     </nav>
 
-    <!-- Botón flotante para agregar -->
     <button id="fab" class="fab">+</button>
   </div>
 
-  <!-- MODAL PARA VER/EDITAR ITEM -->
+  <!-- MODAL PARA TABLERO DE ITEM -->
   <div id="itemModal" class="modal">
     <div class="modal-content">
       <header class="modal-header">
-        <h3 id="modalTitle">Detalle</h3>
+        <h3 id="modalTitle">Tablero</h3>
         <button id="closeModalBtn" class="close-btn">&times;</button>
       </header>
-      <form id="itemForm">
-        <input type="hidden" id="itemId">
-        <input type="hidden" id="itemType">
 
-        <div class="form-group">
-          <label for="editTitle">Título</label>
-          <input type="text" id="editTitle" required>
+      <!-- Edición del item padre -->
+      <div class="item-header">
+        <div class="item-title-area">
+          <span id="viewTitle" class="item-title-text"></span>
+          <button id="editTitleBtn" class="icon-btn">✏️</button>
         </div>
-
-        <div class="form-group">
-          <label for="editDescription">Descripción</label>
-          <textarea id="editDescription" rows="3"></textarea>
+        <div class="item-title-edit" style="display:none;">
+          <input type="text" id="editItemTitle" placeholder="Título">
+          <button id="saveTitleBtn" class="save-btn small">Guardar</button>
+          <button id="cancelTitleBtn" class="cancel-btn small">Cancelar</button>
         </div>
-
-        <!-- Campos específicos según tipo se inyectan aquí -->
-        <div id="dynamicFields"></div>
-
-        <!-- Campos comunes: enlaces, imágenes, textos -->
-        <div class="form-group">
-          <label>Enlaces</label>
-          <div id="linksContainer"></div>
-          <button type="button" class="add-array-btn" data-target="links">+ Añadir enlace</button>
+        <div class="item-desc-area">
+          <span id="viewDesc" class="item-desc-text"></span>
+          <button id="editDescBtn" class="icon-btn">✏️</button>
         </div>
-
-        <div class="form-group">
-          <label>Imágenes (URLs)</label>
-          <div id="imagesContainer"></div>
-          <button type="button" class="add-array-btn" data-target="images">+ Añadir imagen</button>
+        <div class="item-desc-edit" style="display:none;">
+          <textarea id="editItemDesc" rows="2" placeholder="Descripción"></textarea>
+          <button id="saveDescBtn" class="save-btn small">Guardar</button>
+          <button id="cancelDescBtn" class="cancel-btn small">Cancelar</button>
         </div>
+      </div>
 
-        <div class="form-group">
-          <label>Notas adicionales</label>
-          <div id="textsContainer"></div>
-          <button type="button" class="add-array-btn" data-target="texts">+ Añadir nota</button>
-        </div>
+      <!-- Lista de subitems -->
+      <div id="subitemsList" class="subitems-list"></div>
 
-        <div class="form-actions">
-          <button type="submit" class="save-btn">Guardar</button>
-          <button type="button" id="deleteItemBtn" class="delete-btn">Eliminar</button>
-        </div>
-      </form>
+      <!-- Botones para añadir subitems -->
+      <div class="add-subitem-buttons">
+        <button id="addNoteBtn" class="sub-add-btn">📝 Nota</button>
+        <button id="addLinkBtn" class="sub-add-btn">🔗 Enlace</button>
+        <button id="addImageBtn" class="sub-add-btn">🖼️ Imagen</button>
+        <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
+      </div>
+
+      <!-- Eliminar item -->
+      <button id="deleteItemBtn" class="delete-btn full">Eliminar este item</button>
     </div>
   </div>
 
