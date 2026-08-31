@@ -14,7 +14,7 @@ RUN npm install --production
 
 COPY . .
 
-# Crear directorios para datos (opcional, el código lo hará)
+# Crear directorios para datos (el código también los crea, pero por seguridad)
 RUN mkdir -p /app/db /app/uploads
 
 EXPOSE 3000
