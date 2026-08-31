@@ -1,4 +1,4 @@
-FROM node:18-slim
+FROM node:20-slim
 
 RUN apt-get update && apt-get install -y \
     python3 \
@@ -14,7 +14,6 @@ RUN npm install --production
 
 COPY . .
 
-# Crear directorios para datos (el código también los crea, pero por seguridad)
 RUN mkdir -p /app/db /app/uploads
 
 EXPOSE 3000
