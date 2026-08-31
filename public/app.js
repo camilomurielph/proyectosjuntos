@@ -2,8 +2,10 @@
 let currentUser = null;
 let currentType = 'mudanza';
 let items = [];
-let currentItemId = null; // para el tablero
+let currentItemId = null;
+let currentItemType = null;
 let subitems = [];
+let userPosition = null;
 
 // Elementos del DOM
 const loginScreen = document.getElementById('loginScreen');
@@ -19,7 +21,6 @@ const itemModal = document.getElementById('itemModal');
 const closeModalBtn = document.getElementById('closeModalBtn');
 const modalTitle = document.getElementById('modalTitle');
 
-// Elementos del tablero
 const viewTitle = document.getElementById('viewTitle');
 const editTitleBtn = document.getElementById('editTitleBtn');
 const saveTitleBtn = document.getElementById('saveTitleBtn');
@@ -34,6 +35,7 @@ const subitemsList = document.getElementById('subitemsList');
 const addNoteBtn = document.getElementById('addNoteBtn');
 const addLinkBtn = document.getElementById('addLinkBtn');
 const addImageBtn = document.getElementById('addImageBtn');
+const addLocationBtn = document.getElementById('addLocationBtn');
 const imageFileInput = document.getElementById('imageFileInput');
 const deleteItemBtn = document.getElementById('deleteItemBtn');
 
@@ -56,6 +58,36 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// Distancia y geolocalización
+function deg2rad(deg) { return deg * (Math.PI / 180); }
+
+function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function getUserPosition() {
+  return new Promise((resolve) => {
+    if (userPosition) { resolve(userPosition); return; }
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        userPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        resolve(userPosition);
+      },
+      () => { resolve(null); },
+      { enableHighAccuracy: false, timeout: 5000 }
+    );
+  });
+}
+
 // ========== Autenticación ==========
 async function checkSession() {
   try {
@@ -65,6 +97,8 @@ async function checkSession() {
       currentUser = data.username;
       showScreen(mainScreen);
       loadItems(currentType);
+      // Pedir geolocalización en segundo plano
+      getUserPosition();
       return true;
     } else {
       showScreen(loginScreen);
@@ -92,6 +126,7 @@ loginForm.addEventListener('submit', async (e) => {
       currentUser = data.username;
       showScreen(mainScreen);
       loadItems(currentType);
+      getUserPosition();
     } else {
       loginError.textContent = data.error || 'Credenciales incorrectas';
     }
@@ -146,7 +181,7 @@ function renderItems(itemsData) {
   });
 }
 
-// ========== Navegación por tabs ==========
+// ========== Navegación ==========
 bottomNav.addEventListener('click', (e) => {
   const btn = e.target.closest('.tab-btn');
   if (!btn) return;
@@ -156,7 +191,6 @@ bottomNav.addEventListener('click', (e) => {
   loadItems(type);
 });
 
-// ========== Botón flotante (agregar item) ==========
 fab.addEventListener('click', async () => {
   const title = prompt('Título del nuevo item:');
   if (!title) return;
@@ -181,18 +215,23 @@ fab.addEventListener('click', async () => {
 // ========== Tablero ==========
 async function openBoard(item) {
   currentItemId = item.id;
+  currentItemType = item.type;
   modalTitle.textContent = 'Tablero';
-  // Mostrar título y descripción
   viewTitle.textContent = item.title;
   viewDesc.textContent = item.description || 'Sin descripción';
-  // Ocultar editores
   document.querySelector('.item-title-area').style.display = 'flex';
   document.querySelector('.item-title-edit').style.display = 'none';
   document.querySelector('.item-desc-area').style.display = 'flex';
   document.querySelector('.item-desc-edit').style.display = 'none';
-  // Cargar subitems
+
+  // Mostrar/ocultar botón de ubicación según tipo
+  if (item.type === 'restaurante' || item.type === 'cita') {
+    addLocationBtn.style.display = 'inline-block';
+  } else {
+    addLocationBtn.style.display = 'none';
+  }
+
   await loadSubitems(item.id);
-  // Mostrar modal
   itemModal.classList.add('active');
 }
 
@@ -215,27 +254,66 @@ function renderSubitems(subitemsData) {
   let html = '';
   subitemsData.forEach(sub => {
     let contentHtml = '';
+    let icon = '';
     if (sub.type === 'note') {
+      icon = '📝';
       contentHtml = escapeHtml(sub.content);
     } else if (sub.type === 'link') {
-      contentHtml = `<a href="${escapeHtml(sub.content)}" target="_blank">${escapeHtml(sub.content)}</a>`;
+      icon = '🔗';
+      const meta = sub.metadata || {};
+      if (meta.title) {
+        contentHtml = `
+          <div class="link-preview">
+            ${meta.image ? `<img src="${escapeHtml(meta.image)}" alt="" class="preview-img">` : ''}
+            <div class="preview-content">
+              <div class="preview-title">${escapeHtml(meta.title)}</div>
+              ${meta.description ? `<div class="preview-desc">${escapeHtml(meta.description)}</div>` : ''}
+              <div class="preview-url"><a href="${escapeHtml(sub.content)}" target="_blank">${escapeHtml(sub.content)}</a></div>
+            </div>
+          </div>
+        `;
+      } else {
+        contentHtml = `<a href="${escapeHtml(sub.content)}" target="_blank">${escapeHtml(sub.content)}</a>`;
+      }
     } else if (sub.type === 'image') {
+      icon = '🖼️';
       contentHtml = `<img src="${escapeHtml(sub.content)}" alt="Imagen" loading="lazy">`;
+    } else if (sub.type === 'location') {
+      icon = '📍';
+      const meta = sub.metadata || {};
+      const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${meta.lng-0.01},${meta.lat-0.01},${meta.lng+0.01},${meta.lat+0.01}&layer=mapnik&marker=${meta.lat},${meta.lng}`;
+      let distanceHtml = '';
+      if (userPosition && meta.lat && meta.lng) {
+        const dist = getDistanceFromLatLonInKm(userPosition.lat, userPosition.lng, meta.lat, meta.lng);
+        distanceHtml = `<div class="distance">📍 A ${dist.toFixed(1)} km de ti</div>`;
+      } else {
+        // Si no tenemos posición, intentamos obtenerla y recargar
+        if (!userPosition) {
+          getUserPosition().then(() => {
+            if (currentItemId) loadSubitems(currentItemId);
+          });
+        }
+      }
+      contentHtml = `
+        <div class="location-card">
+          <div class="map-container">
+            <iframe src="${mapUrl}" width="100%" height="200" style="border:0;" allowfullscreen loading="lazy"></iframe>
+          </div>
+          <div class="location-address">${escapeHtml(sub.content)}</div>
+          ${meta.display_name ? `<div class="location-name">${escapeHtml(meta.display_name)}</div>` : ''}
+          ${distanceHtml}
+        </div>
+      `;
     }
-    const icon = sub.type === 'note' ? '📝' : sub.type === 'link' ? '🔗' : '🖼️';
     html += `
       <div class="subitem-card" data-id="${sub.id}">
         <div class="sub-icon">${icon}</div>
-        <div class="sub-content">
-          ${contentHtml}
-          <div class="sub-meta">${formatDate(sub.created_at)}</div>
-        </div>
+        <div class="sub-content">${contentHtml}</div>
         <button class="sub-delete" data-id="${sub.id}">✕</button>
       </div>
     `;
   });
   subitemsList.innerHTML = html;
-  // Eventos para eliminar subitems
   document.querySelectorAll('.sub-delete').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -264,7 +342,7 @@ itemModal.addEventListener('click', (e) => {
   }
 });
 
-// ========== Editar título y descripción del item ==========
+// ========== Editar título y descripción ==========
 editTitleBtn.addEventListener('click', () => {
   document.querySelector('.item-title-area').style.display = 'none';
   document.querySelector('.item-title-edit').style.display = 'flex';
@@ -291,7 +369,6 @@ saveTitleBtn.addEventListener('click', async () => {
     viewTitle.textContent = newTitle;
     document.querySelector('.item-title-area').style.display = 'flex';
     document.querySelector('.item-title-edit').style.display = 'none';
-    // Actualizar lista de items
     loadItems(currentType);
   } catch (error) {
     alert('Error al guardar título');
@@ -362,28 +439,29 @@ addNoteBtn.addEventListener('click', async () => {
   }
 });
 
-// Enlace
+// Enlace con preview
 addLinkBtn.addEventListener('click', async () => {
-  const content = prompt('URL del enlace:');
-  if (content === null) return;
-  if (!content.trim()) return alert('La URL no puede estar vacía');
-  // Validación simple
+  const url = prompt('URL del enlace:');
+  if (url === null) return;
+  if (!url.trim()) return alert('La URL no puede estar vacía');
   try {
-    new URL(content.trim());
-  } catch {
-    alert('URL inválida');
-    return;
-  }
-  try {
+    // Obtener metadatos
+    const previewRes = await fetch(`/api/preview?url=${encodeURIComponent(url.trim())}`);
+    const preview = await previewRes.json();
+    const metadata = {
+      title: preview.title || url.trim(),
+      description: preview.description || '',
+      image: preview.image || ''
+    };
     const res = await fetch(`/api/items/${currentItemId}/subitems`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'link', content: content.trim(), metadata: {} })
+      body: JSON.stringify({ type: 'link', content: url.trim(), metadata })
     });
     if (!res.ok) throw new Error('Error al añadir enlace');
     await loadSubitems(currentItemId);
   } catch (error) {
-    alert('Error al añadir enlace');
+    alert('Error al añadir enlace: ' + error.message);
   }
 });
 
@@ -407,7 +485,6 @@ imageFileInput.addEventListener('change', async (e) => {
       throw new Error(err.error || 'Error al subir imagen');
     }
     const data = await res.json();
-    // Crear subitem de tipo imagen con la URL
     const subRes = await fetch(`/api/items/${currentItemId}/subitems`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -415,10 +492,39 @@ imageFileInput.addEventListener('change', async (e) => {
     });
     if (!subRes.ok) throw new Error('Error al guardar imagen');
     await loadSubitems(currentItemId);
-    imageFileInput.value = ''; // limpiar
+    imageFileInput.value = '';
   } catch (error) {
     alert('Error: ' + error.message);
     imageFileInput.value = '';
+  }
+});
+
+// Ubicación (solo para restaurante/cita)
+addLocationBtn.addEventListener('click', async () => {
+  const address = prompt('Dirección de la ubicación:');
+  if (address === null) return;
+  if (!address.trim()) return alert('La dirección no puede estar vacía');
+  try {
+    const geoRes = await fetch(`/api/geocode?address=${encodeURIComponent(address.trim())}`);
+    if (!geoRes.ok) {
+      const err = await geoRes.json();
+      throw new Error(err.error || 'Error al obtener ubicación');
+    }
+    const geo = await geoRes.json();
+    const metadata = {
+      lat: geo.lat,
+      lng: geo.lng,
+      display_name: geo.display_name
+    };
+    const res = await fetch(`/api/items/${currentItemId}/subitems`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'location', content: address.trim(), metadata })
+    });
+    if (!res.ok) throw new Error('Error al guardar ubicación');
+    await loadSubitems(currentItemId);
+  } catch (error) {
+    alert('Error: ' + error.message);
   }
 });
 
