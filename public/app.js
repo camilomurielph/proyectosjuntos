@@ -2,7 +2,8 @@
 let currentUser = null;
 let currentType = 'mudanza';
 let items = [];
-let editingItem = null; // para el modal
+let currentItemId = null; // para el tablero
+let subitems = [];
 
 // Elementos del DOM
 const loginScreen = document.getElementById('loginScreen');
@@ -13,18 +14,27 @@ const logoutBtn = document.getElementById('logoutBtn');
 const itemsList = document.getElementById('itemsList');
 const bottomNav = document.getElementById('bottomNav');
 const fab = document.getElementById('fab');
+
 const itemModal = document.getElementById('itemModal');
 const closeModalBtn = document.getElementById('closeModalBtn');
-const itemForm = document.getElementById('itemForm');
 const modalTitle = document.getElementById('modalTitle');
-const itemId = document.getElementById('itemId');
-const itemType = document.getElementById('itemType');
-const editTitle = document.getElementById('editTitle');
-const editDescription = document.getElementById('editDescription');
-const dynamicFields = document.getElementById('dynamicFields');
-const linksContainer = document.getElementById('linksContainer');
-const imagesContainer = document.getElementById('imagesContainer');
-const textsContainer = document.getElementById('textsContainer');
+
+// Elementos del tablero
+const viewTitle = document.getElementById('viewTitle');
+const editTitleBtn = document.getElementById('editTitleBtn');
+const saveTitleBtn = document.getElementById('saveTitleBtn');
+const cancelTitleBtn = document.getElementById('cancelTitleBtn');
+const editItemTitle = document.getElementById('editItemTitle');
+const viewDesc = document.getElementById('viewDesc');
+const editDescBtn = document.getElementById('editDescBtn');
+const saveDescBtn = document.getElementById('saveDescBtn');
+const cancelDescBtn = document.getElementById('cancelDescBtn');
+const editItemDesc = document.getElementById('editItemDesc');
+const subitemsList = document.getElementById('subitemsList');
+const addNoteBtn = document.getElementById('addNoteBtn');
+const addLinkBtn = document.getElementById('addLinkBtn');
+const addImageBtn = document.getElementById('addImageBtn');
+const imageFileInput = document.getElementById('imageFileInput');
 const deleteItemBtn = document.getElementById('deleteItemBtn');
 
 // ========== Utilidades ==========
@@ -37,6 +47,13 @@ function formatDate(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 // ========== Autenticación ==========
@@ -64,7 +81,6 @@ loginForm.addEventListener('submit', async (e) => {
   const username = document.getElementById('username').value.trim();
   const password = document.getElementById('password').value.trim();
   loginError.textContent = '';
-
   try {
     const res = await fetch('/api/login', {
       method: 'POST',
@@ -121,21 +137,13 @@ function renderItems(itemsData) {
     `;
   });
   itemsList.innerHTML = html;
-  // Asignar eventos de clic para abrir detalle
   document.querySelectorAll('.item-card').forEach(card => {
     card.addEventListener('click', () => {
       const id = parseInt(card.dataset.id);
       const item = items.find(i => i.id === id);
-      if (item) openModal(item);
+      if (item) openBoard(item);
     });
   });
-}
-
-function escapeHtml(text) {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
 }
 
 // ========== Navegación por tabs ==========
@@ -148,278 +156,269 @@ bottomNav.addEventListener('click', (e) => {
   loadItems(type);
 });
 
-// ========== Botón flotante (agregar) ==========
-fab.addEventListener('click', () => {
-  // Crear un item vacío del tipo actual
-  const newItem = {
-    id: null,
-    type: currentType,
-    title: '',
-    description: '',
-    data: getDefaultData(currentType)
-  };
-  openModal(newItem);
+// ========== Botón flotante (agregar item) ==========
+fab.addEventListener('click', async () => {
+  const title = prompt('Título del nuevo item:');
+  if (!title) return;
+  try {
+    const res = await fetch('/api/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: currentType,
+        title: title,
+        description: '',
+        data: {}
+      })
+    });
+    if (!res.ok) throw new Error('Error al crear');
+    loadItems(currentType);
+  } catch (error) {
+    alert('Error al crear el item');
+  }
 });
 
-function getDefaultData(type) {
-  const base = { links: [], images: [], texts: [] };
-  if (type === 'mudanza') return { ...base, budget: '' };
-  if (type === 'restaurante') return { ...base, cuisine: '', location: '', visited: false, rating: 0, favoriteDish: '' };
-  if (type === 'cita') return { ...base, date: '', location: '' };
-  if (type === 'proyecto') return { ...base, customFields: {} };
-  return base;
-}
-
-// ========== Modal ==========
-function openModal(item) {
-  editingItem = item;
-  itemId.value = item.id || '';
-  itemType.value = item.type;
-  editTitle.value = item.title || '';
-  editDescription.value = item.description || '';
-  modalTitle.textContent = item.id ? 'Editar' : 'Nuevo';
-
-  // Renderizar campos dinámicos específicos
-  renderDynamicFields(item.type, item.data || {});
-
-  // Renderizar arrays comunes
-  renderArrayContainer(linksContainer, item.data?.links || [], 'links');
-  renderArrayContainer(imagesContainer, item.data?.images || [], 'images');
-  renderArrayContainer(textsContainer, item.data?.texts || [], 'texts');
-
-  // Mostrar/ocultar botón eliminar
-  deleteItemBtn.style.display = item.id ? 'block' : 'none';
-
+// ========== Tablero ==========
+async function openBoard(item) {
+  currentItemId = item.id;
+  modalTitle.textContent = 'Tablero';
+  // Mostrar título y descripción
+  viewTitle.textContent = item.title;
+  viewDesc.textContent = item.description || 'Sin descripción';
+  // Ocultar editores
+  document.querySelector('.item-title-area').style.display = 'flex';
+  document.querySelector('.item-title-edit').style.display = 'none';
+  document.querySelector('.item-desc-area').style.display = 'flex';
+  document.querySelector('.item-desc-edit').style.display = 'none';
+  // Cargar subitems
+  await loadSubitems(item.id);
+  // Mostrar modal
   itemModal.classList.add('active');
 }
 
-function closeModal() {
-  itemModal.classList.remove('active');
-  editingItem = null;
-}
-
-closeModalBtn.addEventListener('click', closeModal);
-// Cerrar al hacer clic fuera del contenido (en el fondo)
-itemModal.addEventListener('click', (e) => {
-  if (e.target === itemModal) closeModal();
-});
-
-// ========== Campos dinámicos específicos ==========
-function renderDynamicFields(type, data) {
-  dynamicFields.innerHTML = '';
-  const fields = getFieldsForType(type, data);
-  fields.forEach(field => {
-    const div = document.createElement('div');
-    div.className = 'dynamic-field';
-    const label = document.createElement('label');
-    label.textContent = field.label;
-    div.appendChild(label);
-
-    let input;
-    if (field.type === 'select') {
-      input = document.createElement('select');
-      field.options.forEach(opt => {
-        const option = document.createElement('option');
-        option.value = opt.value;
-        option.textContent = opt.label;
-        if (opt.value === field.value) option.selected = true;
-        input.appendChild(option);
-      });
-    } else if (field.type === 'checkbox') {
-      input = document.createElement('input');
-      input.type = 'checkbox';
-      input.checked = field.value || false;
-      const wrapper = document.createElement('div');
-      wrapper.style.display = 'flex';
-      wrapper.style.alignItems = 'center';
-      wrapper.style.gap = '0.5rem';
-      wrapper.appendChild(input);
-      const label2 = document.createElement('span');
-      label2.textContent = field.label;
-      wrapper.appendChild(label2);
-      div.innerHTML = '';
-      div.appendChild(wrapper);
-      // guardar referencia
-      input.dataset.field = field.key;
-      input.dataset.type = 'checkbox';
-      div._input = input;
-    } else {
-      input = document.createElement('input');
-      input.type = field.type || 'text';
-      input.value = field.value || '';
-      input.placeholder = field.placeholder || '';
-    }
-
-    if (!field.type || field.type !== 'checkbox') {
-      input.dataset.field = field.key;
-      div.appendChild(input);
-    }
-    dynamicFields.appendChild(div);
-  });
-}
-
-function getFieldsForType(type, data) {
-  const fields = [];
-  if (type === 'mudanza') {
-    fields.push({ key: 'budget', label: 'Presupuesto (€)', type: 'number', value: data.budget || '' });
-  }
-  if (type === 'restaurante') {
-    fields.push({ key: 'cuisine', label: 'Tipo de cocina', type: 'text', value: data.cuisine || '' });
-    fields.push({ key: 'location', label: 'Ubicación', type: 'text', value: data.location || '' });
-    fields.push({ key: 'visited', label: '¿Visitado?', type: 'checkbox', value: data.visited || false });
-    fields.push({ key: 'rating', label: 'Puntuación (0-5)', type: 'number', value: data.rating || 0, placeholder: '0-5' });
-    fields.push({ key: 'favoriteDish', label: 'Plato favorito', type: 'text', value: data.favoriteDish || '' });
-  }
-  if (type === 'cita') {
-    fields.push({ key: 'date', label: 'Fecha', type: 'date', value: data.date || '' });
-    fields.push({ key: 'location', label: 'Ubicación', type: 'text', value: data.location || '' });
-  }
-  if (type === 'proyecto') {
-    // Podríamos permitir campos personalizados, pero por ahora solo título y descripción
-    // Añadimos un campo extra para customFields? Mejor no complicar.
-    // Dejamos solo título y descripción, y los arrays comunes.
-  }
-  return fields;
-}
-
-// ========== Renderizar arrays (enlaces, imágenes, textos) ==========
-function renderArrayContainer(container, itemsArray, key) {
-  container.innerHTML = '';
-  itemsArray.forEach((val, index) => {
-    const div = document.createElement('div');
-    div.className = 'array-item';
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = val;
-    input.placeholder = key === 'images' ? 'URL de imagen' : key === 'links' ? 'URL' : 'Nota';
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'remove-btn';
-    removeBtn.textContent = '×';
-    removeBtn.addEventListener('click', () => {
-      container.removeChild(div);
-    });
-    div.appendChild(input);
-    div.appendChild(removeBtn);
-    container.appendChild(div);
-  });
-  // Guardar referencia del contenedor para añadir
-  container._key = key;
-}
-
-// Eventos para añadir elementos a arrays (usando delegación)
-document.querySelectorAll('.add-array-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const target = btn.dataset.target; // 'links', 'images', 'texts'
-    const container = document.getElementById(`${target}Container`);
-    if (!container) return;
-    const div = document.createElement('div');
-    div.className = 'array-item';
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = target === 'images' ? 'URL de imagen' : target === 'links' ? 'URL' : 'Nota';
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'remove-btn';
-    removeBtn.textContent = '×';
-    removeBtn.addEventListener('click', () => {
-      container.removeChild(div);
-    });
-    div.appendChild(input);
-    div.appendChild(removeBtn);
-    container.appendChild(div);
-  });
-});
-
-// ========== Guardar item ==========
-itemForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  // Recoger datos comunes
-  const id = itemId.value ? parseInt(itemId.value) : null;
-  const type = itemType.value;
-  const title = editTitle.value.trim();
-  const description = editDescription.value.trim();
-
-  // Recoger campos dinámicos
-  const data = {};
-  // Primero, los valores de los inputs dinámicos
-  const dynamicInputs = dynamicFields.querySelectorAll('input, select');
-  dynamicInputs.forEach(input => {
-    const key = input.dataset.field;
-    if (!key) return;
-    if (input.type === 'checkbox') {
-      data[key] = input.checked;
-    } else {
-      data[key] = input.value;
-    }
-  });
-
-  // Recoger arrays comunes
-  data.links = getArrayValues(linksContainer);
-  data.images = getArrayValues(imagesContainer);
-  data.texts = getArrayValues(textsContainer);
-
-  // Eliminar campos vacíos para limpieza
-  Object.keys(data).forEach(k => {
-    if (data[k] === '' || data[k] === null || data[k] === undefined) delete data[k];
-  });
-
-  const payload = { type, title, description, data };
-
+async function loadSubitems(itemId) {
   try {
-    let res;
-    if (id) {
-      res = await fetch(`/api/items/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-    } else {
-      res = await fetch('/api/items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+    const res = await fetch(`/api/items/${itemId}/subitems`);
+    if (!res.ok) throw new Error('Error al cargar subitems');
+    subitems = await res.json();
+    renderSubitems(subitems);
+  } catch (error) {
+    subitemsList.innerHTML = `<p class="error-msg">Error al cargar</p>`;
+  }
+}
+
+function renderSubitems(subitemsData) {
+  if (subitemsData.length === 0) {
+    subitemsList.innerHTML = `<p class="empty-msg">No hay anotaciones aún. Añade una.</p>`;
+    return;
+  }
+  let html = '';
+  subitemsData.forEach(sub => {
+    let contentHtml = '';
+    if (sub.type === 'note') {
+      contentHtml = escapeHtml(sub.content);
+    } else if (sub.type === 'link') {
+      contentHtml = `<a href="${escapeHtml(sub.content)}" target="_blank">${escapeHtml(sub.content)}</a>`;
+    } else if (sub.type === 'image') {
+      contentHtml = `<img src="${escapeHtml(sub.content)}" alt="Imagen" loading="lazy">`;
     }
-    if (!res.ok) {
-      const err = await res.json();
-      alert('Error: ' + (err.error || 'desconocido'));
-      return;
-    }
-    closeModal();
+    const icon = sub.type === 'note' ? '📝' : sub.type === 'link' ? '🔗' : '🖼️';
+    html += `
+      <div class="subitem-card" data-id="${sub.id}">
+        <div class="sub-icon">${icon}</div>
+        <div class="sub-content">
+          ${contentHtml}
+          <div class="sub-meta">${formatDate(sub.created_at)}</div>
+        </div>
+        <button class="sub-delete" data-id="${sub.id}">✕</button>
+      </div>
+    `;
+  });
+  subitemsList.innerHTML = html;
+  // Eventos para eliminar subitems
+  document.querySelectorAll('.sub-delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      if (!confirm('¿Eliminar este subitem?')) return;
+      try {
+        const res = await fetch(`/api/subitems/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Error al eliminar');
+        await loadSubitems(currentItemId);
+      } catch (error) {
+        alert('Error al eliminar');
+      }
+    });
+  });
+}
+
+// Cerrar modal
+closeModalBtn.addEventListener('click', () => {
+  itemModal.classList.remove('active');
+  currentItemId = null;
+});
+itemModal.addEventListener('click', (e) => {
+  if (e.target === itemModal) {
+    itemModal.classList.remove('active');
+    currentItemId = null;
+  }
+});
+
+// ========== Editar título y descripción del item ==========
+editTitleBtn.addEventListener('click', () => {
+  document.querySelector('.item-title-area').style.display = 'none';
+  document.querySelector('.item-title-edit').style.display = 'flex';
+  editItemTitle.value = viewTitle.textContent;
+});
+cancelTitleBtn.addEventListener('click', () => {
+  document.querySelector('.item-title-area').style.display = 'flex';
+  document.querySelector('.item-title-edit').style.display = 'none';
+});
+saveTitleBtn.addEventListener('click', async () => {
+  const newTitle = editItemTitle.value.trim();
+  if (!newTitle) return;
+  try {
+    const res = await fetch(`/api/items/${currentItemId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: newTitle,
+        description: viewDesc.textContent === 'Sin descripción' ? '' : viewDesc.textContent,
+        data: {}
+      })
+    });
+    if (!res.ok) throw new Error('Error al actualizar');
+    viewTitle.textContent = newTitle;
+    document.querySelector('.item-title-area').style.display = 'flex';
+    document.querySelector('.item-title-edit').style.display = 'none';
+    // Actualizar lista de items
     loadItems(currentType);
   } catch (error) {
-    alert('Error de conexión al guardar');
+    alert('Error al guardar título');
   }
 });
 
-function getArrayValues(container) {
-  const inputs = container.querySelectorAll('.array-item input');
-  const values = [];
-  inputs.forEach(input => {
-    const val = input.value.trim();
-    if (val) values.push(val);
-  });
-  return values;
-}
+editDescBtn.addEventListener('click', () => {
+  document.querySelector('.item-desc-area').style.display = 'none';
+  document.querySelector('.item-desc-edit').style.display = 'flex';
+  editItemDesc.value = viewDesc.textContent === 'Sin descripción' ? '' : viewDesc.textContent;
+});
+cancelDescBtn.addEventListener('click', () => {
+  document.querySelector('.item-desc-area').style.display = 'flex';
+  document.querySelector('.item-desc-edit').style.display = 'none';
+});
+saveDescBtn.addEventListener('click', async () => {
+  const newDesc = editItemDesc.value.trim();
+  try {
+    const res = await fetch(`/api/items/${currentItemId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: viewTitle.textContent,
+        description: newDesc,
+        data: {}
+      })
+    });
+    if (!res.ok) throw new Error('Error al actualizar');
+    viewDesc.textContent = newDesc || 'Sin descripción';
+    document.querySelector('.item-desc-area').style.display = 'flex';
+    document.querySelector('.item-desc-edit').style.display = 'none';
+    loadItems(currentType);
+  } catch (error) {
+    alert('Error al guardar descripción');
+  }
+});
 
 // ========== Eliminar item ==========
 deleteItemBtn.addEventListener('click', async () => {
-  const id = itemId.value;
-  if (!id) return;
-  if (!confirm('¿Estás seguro de eliminar este item?')) return;
+  if (!confirm('¿Eliminar este item y todos sus subitems?')) return;
   try {
-    const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/items/${currentItemId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Error al eliminar');
+    itemModal.classList.remove('active');
+    currentItemId = null;
+    loadItems(currentType);
+  } catch (error) {
+    alert('Error al eliminar');
+  }
+});
+
+// ========== Añadir subitems ==========
+// Nota
+addNoteBtn.addEventListener('click', async () => {
+  const content = prompt('Escribe tu nota:');
+  if (content === null) return;
+  if (!content.trim()) return alert('La nota no puede estar vacía');
+  try {
+    const res = await fetch(`/api/items/${currentItemId}/subitems`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'note', content: content.trim(), metadata: {} })
+    });
+    if (!res.ok) throw new Error('Error al añadir nota');
+    await loadSubitems(currentItemId);
+  } catch (error) {
+    alert('Error al añadir nota');
+  }
+});
+
+// Enlace
+addLinkBtn.addEventListener('click', async () => {
+  const content = prompt('URL del enlace:');
+  if (content === null) return;
+  if (!content.trim()) return alert('La URL no puede estar vacía');
+  // Validación simple
+  try {
+    new URL(content.trim());
+  } catch {
+    alert('URL inválida');
+    return;
+  }
+  try {
+    const res = await fetch(`/api/items/${currentItemId}/subitems`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'link', content: content.trim(), metadata: {} })
+    });
+    if (!res.ok) throw new Error('Error al añadir enlace');
+    await loadSubitems(currentItemId);
+  } catch (error) {
+    alert('Error al añadir enlace');
+  }
+});
+
+// Imagen
+addImageBtn.addEventListener('click', () => {
+  imageFileInput.click();
+});
+
+imageFileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('image', file);
+  try {
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData
+    });
     if (!res.ok) {
       const err = await res.json();
-      alert('Error: ' + (err.error || 'desconocido'));
-      return;
+      throw new Error(err.error || 'Error al subir imagen');
     }
-    closeModal();
-    loadItems(currentType);
-  } catch {
-    alert('Error de conexión al eliminar');
+    const data = await res.json();
+    // Crear subitem de tipo imagen con la URL
+    const subRes = await fetch(`/api/items/${currentItemId}/subitems`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'image', content: data.url, metadata: {} })
+    });
+    if (!subRes.ok) throw new Error('Error al guardar imagen');
+    await loadSubitems(currentItemId);
+    imageFileInput.value = ''; // limpiar
+  } catch (error) {
+    alert('Error: ' + error.message);
+    imageFileInput.value = '';
   }
 });
 
