@@ -16,6 +16,7 @@ const logoutBtn = document.getElementById('logoutBtn');
 const itemsList = document.getElementById('itemsList');
 const bottomNav = document.getElementById('bottomNav');
 const fab = document.getElementById('fab');
+const filtersBar = document.getElementById('filtersBar');
 
 const itemModal = document.getElementById('itemModal');
 const closeModalBtn = document.getElementById('closeModalBtn');
@@ -39,6 +40,22 @@ const addLocationBtn = document.getElementById('addLocationBtn');
 const imageFileInput = document.getElementById('imageFileInput');
 const deleteItemBtn = document.getElementById('deleteItemBtn');
 
+// Estrellas
+const ratingArea = document.getElementById('ratingArea');
+const starsContainer = document.getElementById('starsContainer');
+const ratingInfo = document.getElementById('ratingInfo');
+
+// Ubicación modal
+const locationModal = document.getElementById('locationModal');
+const locationSearchInput = document.getElementById('locationSearchInput');
+const locationSuggestions = document.getElementById('locationSuggestions');
+const cancelLocationBtn = document.getElementById('cancelLocationBtn');
+
+// Filtros
+const filterRating = document.getElementById('filterRating');
+const filterDistance = document.getElementById('filterDistance');
+let currentSort = 'rating'; // 'rating' o 'distance'
+
 // ========== Utilidades ==========
 function showScreen(screen) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -58,7 +75,6 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Distancia y geolocalización
 function deg2rad(deg) { return deg * (Math.PI / 180); }
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
@@ -88,6 +104,47 @@ function getUserPosition() {
   });
 }
 
+// ========== Estrellas ==========
+function renderStars(rating) {
+  return '★'.repeat(rating) + '☆'.repeat(5 - rating);
+}
+
+function updateStarsDisplay(itemData) {
+  const ratings = itemData.ratings || {};
+  const myRating = ratings[currentUser] || 0;
+  starsContainer.textContent = renderStars(myRating);
+  ratingInfo.textContent = myRating > 0 ? `Tu puntuación: ${myRating}/5` : 'Puntúa este restaurante';
+  // Guardar referencia en el elemento para manejar clicks
+  starsContainer.dataset.currentRating = myRating;
+}
+
+async function saveRating(rating) {
+  if (!currentItemId || currentItemType !== 'restaurante') return;
+  const item = items.find(i => i.id === currentItemId);
+  if (!item) return;
+  const data = item.data || {};
+  if (!data.ratings) data.ratings = {};
+  data.ratings[currentUser] = rating;
+  try {
+    const res = await fetch(`/api/items/${currentItemId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: viewTitle.textContent,
+        description: viewDesc.textContent === 'Sin descripción' ? '' : viewDesc.textContent,
+        data: data
+      })
+    });
+    if (!res.ok) throw new Error('Error al guardar puntuación');
+    // Actualizar la lista de items para reflejar el cambio
+    loadItems(currentType);
+    // Actualizar visualización local
+    updateStarsDisplay(data);
+  } catch (error) {
+    alert('Error al guardar puntuación');
+  }
+}
+
 // ========== Autenticación ==========
 async function checkSession() {
   try {
@@ -97,7 +154,6 @@ async function checkSession() {
       currentUser = data.username;
       showScreen(mainScreen);
       loadItems(currentType);
-      // Pedir geolocalización en segundo plano
       getUserPosition();
       return true;
     } else {
@@ -144,14 +200,57 @@ logoutBtn.addEventListener('click', async () => {
 // ========== Carga de items ==========
 async function loadItems(type) {
   currentType = type;
+  // Mostrar u ocultar filtros
+  filtersBar.style.display = (type === 'restaurante') ? 'flex' : 'none';
   try {
     const res = await fetch(`/api/items?type=${encodeURIComponent(type)}`);
     if (!res.ok) throw new Error('Error al cargar');
     items = await res.json();
-    renderItems(items);
+    // Para restaurantes, calcular distancia y añadir a cada item
+    if (type === 'restaurante' && userPosition) {
+      // Obtener subitems de ubicación para cada item (necesitamos las coordenadas)
+      for (let item of items) {
+        const subRes = await fetch(`/api/items/${item.id}/subitems`);
+        if (subRes.ok) {
+          const subs = await subRes.json();
+          const locationSub = subs.find(s => s.type === 'location');
+          if (locationSub && locationSub.metadata && locationSub.metadata.lat) {
+            const dist = getDistanceFromLatLonInKm(
+              userPosition.lat, userPosition.lng,
+              locationSub.metadata.lat, locationSub.metadata.lng
+            );
+            item.distance = dist;
+          }
+        }
+      }
+    }
+    renderItemsWithSort(items, currentSort);
   } catch (error) {
     itemsList.innerHTML = `<p class="error-msg">Error al cargar los items</p>`;
   }
+}
+
+function renderItemsWithSort(itemsData, sortBy) {
+  // Clonar para no modificar original
+  let sorted = [...itemsData];
+  if (currentType === 'restaurante') {
+    if (sortBy === 'rating') {
+      sorted.sort((a, b) => {
+        const aRatings = a.data?.ratings || {};
+        const bRatings = b.data?.ratings || {};
+        const aAvg = Object.values(aRatings).reduce((s, v) => s + v, 0) / (Object.keys(aRatings).length || 1);
+        const bAvg = Object.values(bRatings).reduce((s, v) => s + v, 0) / (Object.keys(bRatings).length || 1);
+        return bAvg - aAvg;
+      });
+    } else if (sortBy === 'distance') {
+      sorted.sort((a, b) => {
+        const aDist = a.distance !== undefined ? a.distance : Infinity;
+        const bDist = b.distance !== undefined ? b.distance : Infinity;
+        return aDist - bDist;
+      });
+    }
+  }
+  renderItems(sorted);
 }
 
 function renderItems(itemsData) {
@@ -161,13 +260,37 @@ function renderItems(itemsData) {
   }
   let html = '';
   itemsData.forEach(item => {
-    const data = item.data || {};
-    const summary = item.description || data.cuisine || data.location || '';
+    const isRestaurant = (item.type === 'restaurante');
+    let metaHtml = '';
+    if (isRestaurant) {
+      // Estrellas
+      const ratings = item.data?.ratings || {};
+      const values = Object.values(ratings);
+      const avg = values.length ? (values.reduce((s, v) => s + v, 0) / values.length) : 0;
+      const stars = avg > 0 ? `⭐ ${avg.toFixed(1)}` : 'Sin puntuar';
+      // Distancia
+      let distHtml = '';
+      if (item.distance !== undefined && item.distance !== Infinity) {
+        distHtml = `📍 ${item.distance.toFixed(1)} km`;
+      } else {
+        distHtml = '📍 Sin ubicación';
+      }
+      metaHtml = `<div class="item-meta">
+        <span class="stars">${stars}</span>
+        <span class="distance">${distHtml}</span>
+        <span class="date">${formatDate(item.created_at)}</span>
+      </div>`;
+    } else {
+      metaHtml = `<div class="item-meta">
+        <span class="date">${formatDate(item.created_at)}</span>
+      </div>`;
+    }
+    const summary = item.description || '';
     html += `
       <div class="item-card" data-id="${item.id}">
         <h4>${escapeHtml(item.title)}</h4>
         ${summary ? `<p>${escapeHtml(summary)}</p>` : ''}
-        <div class="meta">${formatDate(item.created_at)}</div>
+        ${metaHtml}
       </div>
     `;
   });
@@ -181,7 +304,7 @@ function renderItems(itemsData) {
   });
 }
 
-// ========== Navegación ==========
+// ========== Navegación y filtros ==========
 bottomNav.addEventListener('click', (e) => {
   const btn = e.target.closest('.tab-btn');
   if (!btn) return;
@@ -189,6 +312,19 @@ bottomNav.addEventListener('click', (e) => {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   loadItems(type);
+});
+
+filterRating.addEventListener('click', () => {
+  filterRating.classList.add('active');
+  filterDistance.classList.remove('active');
+  currentSort = 'rating';
+  renderItemsWithSort(items, currentSort);
+});
+filterDistance.addEventListener('click', () => {
+  filterDistance.classList.add('active');
+  filterRating.classList.remove('active');
+  currentSort = 'distance';
+  renderItemsWithSort(items, currentSort);
 });
 
 fab.addEventListener('click', async () => {
@@ -224,12 +360,31 @@ async function openBoard(item) {
   document.querySelector('.item-desc-area').style.display = 'flex';
   document.querySelector('.item-desc-edit').style.display = 'none';
 
-  // Mostrar/ocultar botón de ubicación según tipo
+  // Mostrar/ocultar área de estrellas
+  if (item.type === 'restaurante') {
+    ratingArea.style.display = 'block';
+    updateStarsDisplay(item.data || {});
+    // Event listener para estrellas
+    starsContainer.onclick = function(e) {
+      const rect = this.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const starWidth = rect.width / 5;
+      const rating = Math.min(5, Math.max(1, Math.ceil(clickX / starWidth)));
+      saveRating(rating);
+    };
+  } else {
+    ratingArea.style.display = 'none';
+  }
+
+  // Mostrar/ocultar botón de ubicación
   if (item.type === 'restaurante' || item.type === 'cita') {
     addLocationBtn.style.display = 'inline-block';
   } else {
     addLocationBtn.style.display = 'none';
   }
+
+  // Ocultar modal de ubicación si estaba abierto
+  locationModal.style.display = 'none';
 
   await loadSubitems(item.id);
   itemModal.classList.add('active');
@@ -268,7 +423,7 @@ function renderSubitems(subitemsData) {
             <div class="preview-content">
               <div class="preview-title">${escapeHtml(meta.title)}</div>
               ${meta.description ? `<div class="preview-desc">${escapeHtml(meta.description)}</div>` : ''}
-              <div class="preview-url"><a href="${escapeHtml(sub.content)}" target="_blank">${escapeHtml(sub.content)}</a></div>
+              <div class="preview-url"><a href="${escapeHtml(sub.content)}" target="_blank">🔗</a></div>
             </div>
           </div>
         `;
@@ -285,9 +440,8 @@ function renderSubitems(subitemsData) {
       let distanceHtml = '';
       if (userPosition && meta.lat && meta.lng) {
         const dist = getDistanceFromLatLonInKm(userPosition.lat, userPosition.lng, meta.lat, meta.lng);
-        distanceHtml = `<div class="distance">📍 A ${dist.toFixed(1)} km de ti</div>`;
+        distanceHtml = `<div class="distance">📍 ${dist.toFixed(1)} km</div>`;
       } else {
-        // Si no tenemos posición, intentamos obtenerla y recargar
         if (!userPosition) {
           getUserPosition().then(() => {
             if (currentItemId) loadSubitems(currentItemId);
@@ -297,7 +451,7 @@ function renderSubitems(subitemsData) {
       contentHtml = `
         <div class="location-card">
           <div class="map-container">
-            <iframe src="${mapUrl}" width="100%" height="200" style="border:0;" allowfullscreen loading="lazy"></iframe>
+            <iframe src="${mapUrl}" width="100%" height="100%" style="border:0;" allowfullscreen loading="lazy"></iframe>
           </div>
           <div class="location-address">${escapeHtml(sub.content)}</div>
           ${meta.display_name ? `<div class="location-name">${escapeHtml(meta.display_name)}</div>` : ''}
@@ -323,6 +477,8 @@ function renderSubitems(subitemsData) {
         const res = await fetch(`/api/subitems/${id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Error al eliminar');
         await loadSubitems(currentItemId);
+        // Recargar items para actualizar distancias si era ubicación
+        loadItems(currentType);
       } catch (error) {
         alert('Error al eliminar');
       }
@@ -334,11 +490,13 @@ function renderSubitems(subitemsData) {
 closeModalBtn.addEventListener('click', () => {
   itemModal.classList.remove('active');
   currentItemId = null;
+  locationModal.style.display = 'none';
 });
 itemModal.addEventListener('click', (e) => {
   if (e.target === itemModal) {
     itemModal.classList.remove('active');
     currentItemId = null;
+    locationModal.style.display = 'none';
   }
 });
 
@@ -362,7 +520,7 @@ saveTitleBtn.addEventListener('click', async () => {
       body: JSON.stringify({
         title: newTitle,
         description: viewDesc.textContent === 'Sin descripción' ? '' : viewDesc.textContent,
-        data: {}
+        data: items.find(i => i.id === currentItemId)?.data || {}
       })
     });
     if (!res.ok) throw new Error('Error al actualizar');
@@ -393,7 +551,7 @@ saveDescBtn.addEventListener('click', async () => {
       body: JSON.stringify({
         title: viewTitle.textContent,
         description: newDesc,
-        data: {}
+        data: items.find(i => i.id === currentItemId)?.data || {}
       })
     });
     if (!res.ok) throw new Error('Error al actualizar');
@@ -439,13 +597,12 @@ addNoteBtn.addEventListener('click', async () => {
   }
 });
 
-// Enlace con preview
+// Enlace
 addLinkBtn.addEventListener('click', async () => {
   const url = prompt('URL del enlace:');
   if (url === null) return;
   if (!url.trim()) return alert('La URL no puede estar vacía');
   try {
-    // Obtener metadatos
     const previewRes = await fetch(`/api/preview?url=${encodeURIComponent(url.trim())}`);
     const preview = await previewRes.json();
     const metadata = {
@@ -499,34 +656,65 @@ imageFileInput.addEventListener('change', async (e) => {
   }
 });
 
-// Ubicación (solo para restaurante/cita)
-addLocationBtn.addEventListener('click', async () => {
-  const address = prompt('Dirección de la ubicación:');
-  if (address === null) return;
-  if (!address.trim()) return alert('La dirección no puede estar vacía');
-  try {
-    const geoRes = await fetch(`/api/geocode?address=${encodeURIComponent(address.trim())}`);
-    if (!geoRes.ok) {
-      const err = await geoRes.json();
-      throw new Error(err.error || 'Error al obtener ubicación');
+// ===== Ubicación con autocompletado =====
+let locationSearchTimeout = null;
+
+addLocationBtn.addEventListener('click', () => {
+  locationModal.style.display = 'block';
+  locationSearchInput.value = '';
+  locationSuggestions.innerHTML = '';
+  locationSearchInput.focus();
+});
+
+cancelLocationBtn.addEventListener('click', () => {
+  locationModal.style.display = 'none';
+});
+
+locationSearchInput.addEventListener('input', async () => {
+  const query = locationSearchInput.value.trim();
+  if (query.length < 2) {
+    locationSuggestions.innerHTML = '';
+    return;
+  }
+  clearTimeout(locationSearchTimeout);
+  locationSearchTimeout = setTimeout(async () => {
+    try {
+      const res = await fetch(`/api/search-places?query=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error('Error en búsqueda');
+      const data = await res.json();
+      locationSuggestions.innerHTML = data.map(item => `
+        <div class="suggestion-item" style="padding:0.5rem; background:#333; margin-bottom:0.2rem; cursor:pointer; border-radius:0px;">
+          ${escapeHtml(item.label)}
+        </div>
+      `).join('');
+      document.querySelectorAll('.suggestion-item').forEach((el, index) => {
+        el.addEventListener('click', () => {
+          const selected = data[index];
+          addLocation(selected.label, selected.lat, selected.lng, selected.display_name);
+        });
+      });
+    } catch (error) {
+      console.error(error);
     }
-    const geo = await geoRes.json();
-    const metadata = {
-      lat: geo.lat,
-      lng: geo.lng,
-      display_name: geo.display_name
-    };
+  }, 300);
+});
+
+async function addLocation(address, lat, lng, displayName) {
+  try {
+    const metadata = { lat, lng, display_name: displayName || address };
     const res = await fetch(`/api/items/${currentItemId}/subitems`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'location', content: address.trim(), metadata })
+      body: JSON.stringify({ type: 'location', content: address, metadata })
     });
     if (!res.ok) throw new Error('Error al guardar ubicación');
+    locationModal.style.display = 'none';
     await loadSubitems(currentItemId);
+    loadItems(currentType); // Actualizar distancias en la lista
   } catch (error) {
-    alert('Error: ' + error.message);
+    alert('Error al añadir ubicación: ' + error.message);
   }
-});
+}
 
 // ========== Inicialización ==========
 checkSession();
