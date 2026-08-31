@@ -15,8 +15,8 @@ WORKDIR /app
 # Copia los archivos de dependencias primero (para aprovechar caché)
 COPY package*.json ./
 
-# Instala dependencias (solo producción)
-RUN npm ci --only=production
+# Instala dependencias (solo producción). Si no hay lockfile, usa npm install.
+RUN npm install --production
 
 # Copia el resto del código
 COPY . .
