@@ -766,3 +766,23 @@ button,
 #cropModal input {
   border-radius: 6px !important;
 }
+
+/* Ajustar altura del modal de ubicación y lista de sugerencias */
+#locationModal .modal-content {
+  padding: 1.2rem 1.2rem 1.5rem; /* más espacio inferior */
+}
+
+#suggestionsList {
+  max-height: 250px !important; /* suficiente para ver varias sugerencias */
+  overflow-y: auto;
+}
+
+#suggestionsList .suggestion-item {
+  padding: 0.6rem 0.8rem; /* un poco más de espacio entre elementos */
+  font-size: 0.9rem;
+}
+
+/* Asegurar que el input y la lista estén alineados */
+#locationInput {
+  font-size: 1rem;
+}
