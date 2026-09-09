@@ -37,11 +37,11 @@ const addNoteBtn = document.getElementById('addNoteBtn');
 const addLinkBtn = document.getElementById('addLinkBtn');
 const addImageBtn = document.getElementById('addImageBtn');
 const addLocationBtn = document.getElementById('addLocationBtn');
-const imageFileInput = document.getElementById('imageFileInput');
 const deleteItemBtn = document.getElementById('deleteItemBtn');
 
 // Estrellas
 const ratingArea = document.getElementById('ratingArea');
+const ratingsDisplay = document.getElementById('ratingsDisplay');
 const starsContainer = document.getElementById('starsContainer');
 const ratingInfo = document.getElementById('ratingInfo');
 
@@ -51,10 +51,24 @@ const locationSearchInput = document.getElementById('locationSearchInput');
 const locationSuggestions = document.getElementById('locationSuggestions');
 const cancelLocationBtn = document.getElementById('cancelLocationBtn');
 
+// Link modal
+const linkModal = document.getElementById('linkModal');
+const linkUrlInput = document.getElementById('linkUrlInput');
+const linkNameInput = document.getElementById('linkNameInput');
+const linkConfirmBtn = document.getElementById('linkConfirmBtn');
+const linkCancelBtn = document.getElementById('linkCancelBtn');
+
+// Crop modal
+const cropModal = document.getElementById('cropModal');
+const cropCanvas = document.getElementById('cropCanvas');
+const closeCropBtn = document.getElementById('closeCropBtn');
+const cropConfirmBtn = document.getElementById('cropConfirmBtn');
+const cropCancelBtn = document.getElementById('cropCancelBtn');
+
 // Filtros
 const filterRating = document.getElementById('filterRating');
 const filterDistance = document.getElementById('filterDistance');
-let currentSort = 'rating'; // 'rating' o 'distance'
+let currentSort = 'rating';
 
 // ========== Utilidades ==========
 function showScreen(screen) {
@@ -109,12 +123,23 @@ function renderStars(rating) {
   return '★'.repeat(rating) + '☆'.repeat(5 - rating);
 }
 
-function updateStarsDisplay(itemData) {
-  const ratings = itemData.ratings || {};
+function updateRatingsDisplay(itemData) {
+  const ratings = itemData?.ratings || {};
+  const entries = Object.entries(ratings);
+  if (entries.length === 0) {
+    ratingsDisplay.innerHTML = '<span style="color:#888;">Sin puntuaciones aún</span>';
+  } else {
+    ratingsDisplay.innerHTML = entries.map(([user, rating]) => `
+      <div class="rating-item">
+        <span class="username">${escapeHtml(user)}</span>
+        <span class="stars">${renderStars(rating)}</span>
+      </div>
+    `).join('');
+  }
+  // Actualizar mi puntuación
   const myRating = ratings[currentUser] || 0;
   starsContainer.textContent = renderStars(myRating);
   ratingInfo.textContent = myRating > 0 ? `Tu puntuación: ${myRating}/5` : 'Puntúa este restaurante';
-  // Guardar referencia en el elemento para manejar clicks
   starsContainer.dataset.currentRating = myRating;
 }
 
@@ -139,7 +164,7 @@ async function saveRating(rating) {
     // Actualizar la lista de items para reflejar el cambio
     loadItems(currentType);
     // Actualizar visualización local
-    updateStarsDisplay(data);
+    updateRatingsDisplay(data);
   } catch (error) {
     alert('Error al guardar puntuación');
   }
@@ -208,7 +233,6 @@ async function loadItems(type) {
     items = await res.json();
     // Para restaurantes, calcular distancia y añadir a cada item
     if (type === 'restaurante' && userPosition) {
-      // Obtener subitems de ubicación para cada item (necesitamos las coordenadas)
       for (let item of items) {
         const subRes = await fetch(`/api/items/${item.id}/subitems`);
         if (subRes.ok) {
@@ -231,7 +255,6 @@ async function loadItems(type) {
 }
 
 function renderItemsWithSort(itemsData, sortBy) {
-  // Clonar para no modificar original
   let sorted = [...itemsData];
   if (currentType === 'restaurante') {
     if (sortBy === 'rating') {
@@ -263,7 +286,7 @@ function renderItems(itemsData) {
     const isRestaurant = (item.type === 'restaurante');
     let metaHtml = '';
     if (isRestaurant) {
-      // Estrellas
+      // Estrellas promedio
       const ratings = item.data?.ratings || {};
       const values = Object.values(ratings);
       const avg = values.length ? (values.reduce((s, v) => s + v, 0) / values.length) : 0;
@@ -363,8 +386,7 @@ async function openBoard(item) {
   // Mostrar/ocultar área de estrellas
   if (item.type === 'restaurante') {
     ratingArea.style.display = 'block';
-    updateStarsDisplay(item.data || {});
-    // Event listener para estrellas
+    updateRatingsDisplay(item.data || {});
     starsContainer.onclick = function(e) {
       const rect = this.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
@@ -383,8 +405,10 @@ async function openBoard(item) {
     addLocationBtn.style.display = 'none';
   }
 
-  // Ocultar modal de ubicación si estaba abierto
+  // Ocultar modales secundarios
   locationModal.style.display = 'none';
+  linkModal.style.display = 'none';
+  cropModal.classList.remove('active');
 
   await loadSubitems(item.id);
   itemModal.classList.add('active');
@@ -409,32 +433,16 @@ function renderSubitems(subitemsData) {
   let html = '';
   subitemsData.forEach(sub => {
     let contentHtml = '';
-    let icon = '';
     if (sub.type === 'note') {
-      icon = '📝';
       contentHtml = escapeHtml(sub.content);
     } else if (sub.type === 'link') {
-      icon = '🔗';
       const meta = sub.metadata || {};
-      if (meta.title) {
-        contentHtml = `
-          <div class="link-preview">
-            ${meta.image ? `<img src="${escapeHtml(meta.image)}" alt="" class="preview-img">` : ''}
-            <div class="preview-content">
-              <div class="preview-title">${escapeHtml(meta.title)}</div>
-              ${meta.description ? `<div class="preview-desc">${escapeHtml(meta.description)}</div>` : ''}
-              <div class="preview-url"><a href="${escapeHtml(sub.content)}" target="_blank">🔗</a></div>
-            </div>
-          </div>
-        `;
-      } else {
-        contentHtml = `<a href="${escapeHtml(sub.content)}" target="_blank">${escapeHtml(sub.content)}</a>`;
-      }
+      const name = meta.name || sub.content;
+      const url = meta.url || sub.content;
+      contentHtml = `<a href="${escapeHtml(url)}" target="_blank">${escapeHtml(name)}</a>`;
     } else if (sub.type === 'image') {
-      icon = '🖼️';
       contentHtml = `<img src="${escapeHtml(sub.content)}" alt="Imagen" loading="lazy">`;
     } else if (sub.type === 'location') {
-      icon = '📍';
       const meta = sub.metadata || {};
       const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${meta.lng-0.01},${meta.lat-0.01},${meta.lng+0.01},${meta.lat+0.01}&layer=mapnik&marker=${meta.lat},${meta.lng}`;
       let distanceHtml = '';
@@ -461,7 +469,6 @@ function renderSubitems(subitemsData) {
     }
     html += `
       <div class="subitem-card" data-id="${sub.id}">
-        <div class="sub-icon">${icon}</div>
         <div class="sub-content">${contentHtml}</div>
         <button class="sub-delete" data-id="${sub.id}">✕</button>
       </div>
@@ -477,7 +484,6 @@ function renderSubitems(subitemsData) {
         const res = await fetch(`/api/subitems/${id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Error al eliminar');
         await loadSubitems(currentItemId);
-        // Recargar items para actualizar distancias si era ubicación
         loadItems(currentType);
       } catch (error) {
         alert('Error al eliminar');
@@ -486,17 +492,21 @@ function renderSubitems(subitemsData) {
   });
 }
 
-// Cerrar modal
+// Cerrar modal principal
 closeModalBtn.addEventListener('click', () => {
   itemModal.classList.remove('active');
   currentItemId = null;
   locationModal.style.display = 'none';
+  linkModal.style.display = 'none';
+  cropModal.classList.remove('active');
 });
 itemModal.addEventListener('click', (e) => {
   if (e.target === itemModal) {
     itemModal.classList.remove('active');
     currentItemId = null;
     locationModal.style.display = 'none';
+    linkModal.style.display = 'none';
+    cropModal.classList.remove('active');
   }
 });
 
@@ -597,45 +607,206 @@ addNoteBtn.addEventListener('click', async () => {
   }
 });
 
-// Enlace
-addLinkBtn.addEventListener('click', async () => {
-  const url = prompt('URL del enlace:');
-  if (url === null) return;
-  if (!url.trim()) return alert('La URL no puede estar vacía');
+// Enlace con nombre
+addLinkBtn.addEventListener('click', () => {
+  linkModal.style.display = 'block';
+  linkUrlInput.value = '';
+  linkNameInput.value = '';
+  linkUrlInput.focus();
+});
+
+linkCancelBtn.addEventListener('click', () => {
+  linkModal.style.display = 'none';
+});
+
+linkConfirmBtn.addEventListener('click', async () => {
+  const url = linkUrlInput.value.trim();
+  const name = linkNameInput.value.trim();
+  if (!url) return alert('La URL es obligatoria');
+  if (!name) return alert('El nombre es obligatorio');
   try {
-    const previewRes = await fetch(`/api/preview?url=${encodeURIComponent(url.trim())}`);
-    const preview = await previewRes.json();
-    const metadata = {
-      title: preview.title || url.trim(),
-      description: preview.description || '',
-      image: preview.image || ''
-    };
+    const metadata = { name: name, url: url };
+    // Opcional: obtener preview para enriquecer (pero no lo usamos en la tarjeta)
     const res = await fetch(`/api/items/${currentItemId}/subitems`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'link', content: url.trim(), metadata })
+      body: JSON.stringify({ type: 'link', content: url, metadata })
     });
     if (!res.ok) throw new Error('Error al añadir enlace');
+    linkModal.style.display = 'none';
     await loadSubitems(currentItemId);
   } catch (error) {
     alert('Error al añadir enlace: ' + error.message);
   }
 });
 
-// Imagen
+// Imagen con recorte
+let cropImageFile = null;
+let cropImageDataUrl = null;
+let cropRect = { x: 0, y: 0, size: 200 }; // tamaño en píxeles del canvas
+let isDragging = false;
+let dragStartX, dragStartY;
+
 addImageBtn.addEventListener('click', () => {
-  imageFileInput.click();
+  // Crear un input de archivo temporal
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      cropImageDataUrl = ev.target.result;
+      cropImageFile = file;
+      openCropModal();
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
 });
 
-imageFileInput.addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const formData = new FormData();
-  formData.append('image', file);
+function openCropModal() {
+  cropModal.classList.add('active');
+  // Dibujar imagen en canvas
+  const img = new Image();
+  img.onload = () => {
+    const canvas = cropCanvas;
+    const ctx = canvas.getContext('2d');
+    // Ajustar tamaño del canvas para que quepa en la vista
+    const maxWidth = cropModal.querySelector('.modal-content').clientWidth - 40;
+    const maxHeight = window.innerHeight * 0.6;
+    let width = img.width;
+    let height = img.height;
+    if (width > maxWidth) {
+      const ratio = maxWidth / width;
+      width = maxWidth;
+      height = height * ratio;
+    }
+    if (height > maxHeight) {
+      const ratio = maxHeight / height;
+      height = maxHeight;
+      width = width * ratio;
+    }
+    canvas.width = width;
+    canvas.height = height;
+    // Dibujar imagen
+    ctx.drawImage(img, 0, 0, width, height);
+    // Inicializar rectángulo de recorte (cuadrado en el centro)
+    const size = Math.min(width, height) * 0.6;
+    cropRect = {
+      x: (width - size) / 2,
+      y: (height - size) / 2,
+      size: size
+    };
+    drawCrop();
+  };
+  img.src = cropImageDataUrl;
+}
+
+function drawCrop() {
+  const canvas = cropCanvas;
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  img.onload = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    // Dibujar overlay oscuro fuera del cuadrado
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, 0, canvas.width, cropRect.y);
+    ctx.fillRect(0, cropRect.y + cropRect.size, canvas.width, canvas.height - cropRect.y - cropRect.size);
+    ctx.fillRect(0, cropRect.y, cropRect.x, cropRect.size);
+    ctx.fillRect(cropRect.x + cropRect.size, cropRect.y, canvas.width - cropRect.x - cropRect.size, cropRect.size);
+    // Borde del cuadrado
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cropRect.x, cropRect.y, cropRect.size, cropRect.size);
+  };
+  img.src = cropImageDataUrl;
+}
+
+// Eventos para arrastrar el cuadrado de recorte
+cropCanvas.addEventListener('mousedown', (e) => {
+  const rect = cropCanvas.getBoundingClientRect();
+  const mouseX = (e.clientX - rect.left) * (cropCanvas.width / rect.width);
+  const mouseY = (e.clientY - rect.top) * (cropCanvas.height / rect.height);
+  // Verificar si el clic está dentro del cuadrado
+  if (mouseX >= cropRect.x && mouseX <= cropRect.x + cropRect.size &&
+      mouseY >= cropRect.y && mouseY <= cropRect.y + cropRect.size) {
+    isDragging = true;
+    dragStartX = mouseX - cropRect.x;
+    dragStartY = mouseY - cropRect.y;
+    cropCanvas.style.cursor = 'move';
+  }
+});
+cropCanvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const rect = cropCanvas.getBoundingClientRect();
+  const mouseX = (touch.clientX - rect.left) * (cropCanvas.width / rect.width);
+  const mouseY = (touch.clientY - rect.top) * (cropCanvas.height / rect.height);
+  if (mouseX >= cropRect.x && mouseX <= cropRect.x + cropRect.size &&
+      mouseY >= cropRect.y && mouseY <= cropRect.y + cropRect.size) {
+    isDragging = true;
+    dragStartX = mouseX - cropRect.x;
+    dragStartY = mouseY - cropRect.y;
+  }
+});
+window.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  const rect = cropCanvas.getBoundingClientRect();
+  const mouseX = (e.clientX - rect.left) * (cropCanvas.width / rect.width);
+  const mouseY = (e.clientY - rect.top) * (cropCanvas.height / rect.height);
+  let newX = mouseX - dragStartX;
+  let newY = mouseY - dragStartY;
+  // Limitar al canvas
+  newX = Math.max(0, Math.min(cropCanvas.width - cropRect.size, newX));
+  newY = Math.max(0, Math.min(cropCanvas.height - cropRect.size, newY));
+  cropRect.x = newX;
+  cropRect.y = newY;
+  drawCrop();
+});
+window.addEventListener('touchmove', (e) => {
+  if (!isDragging) return;
+  e.preventDefault();
+  const touch = e.touches[0];
+  const rect = cropCanvas.getBoundingClientRect();
+  const mouseX = (touch.clientX - rect.left) * (cropCanvas.width / rect.width);
+  const mouseY = (touch.clientY - rect.top) * (cropCanvas.height / rect.height);
+  let newX = mouseX - dragStartX;
+  let newY = mouseY - dragStartY;
+  newX = Math.max(0, Math.min(cropCanvas.width - cropRect.size, newX));
+  newY = Math.max(0, Math.min(cropCanvas.height - cropRect.size, newY));
+  cropRect.x = newX;
+  cropRect.y = newY;
+  drawCrop();
+});
+window.addEventListener('mouseup', () => {
+  isDragging = false;
+  cropCanvas.style.cursor = 'default';
+});
+window.addEventListener('touchend', () => {
+  isDragging = false;
+});
+
+// Confirmar recorte
+cropConfirmBtn.addEventListener('click', async () => {
+  const canvas = cropCanvas;
+  const ctx = canvas.getContext('2d');
+  // Recortar la región del cuadrado
+  const imageData = ctx.getImageData(cropRect.x, cropRect.y, cropRect.size, cropRect.size);
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = cropRect.size;
+  tempCanvas.height = cropRect.size;
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCtx.putImageData(imageData, 0, 0);
+  const croppedDataUrl = tempCanvas.toDataURL('image/webp', 0.9);
+  // Subir la imagen recortada
   try {
     const res = await fetch('/api/upload', {
       method: 'POST',
-      body: formData
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: croppedDataUrl })
     });
     if (!res.ok) {
       const err = await res.json();
@@ -648,12 +819,18 @@ imageFileInput.addEventListener('change', async (e) => {
       body: JSON.stringify({ type: 'image', content: data.url, metadata: {} })
     });
     if (!subRes.ok) throw new Error('Error al guardar imagen');
+    cropModal.classList.remove('active');
     await loadSubitems(currentItemId);
-    imageFileInput.value = '';
   } catch (error) {
     alert('Error: ' + error.message);
-    imageFileInput.value = '';
   }
+});
+
+cropCancelBtn.addEventListener('click', () => {
+  cropModal.classList.remove('active');
+});
+closeCropBtn.addEventListener('click', () => {
+  cropModal.classList.remove('active');
 });
 
 // ===== Ubicación con autocompletado =====
@@ -710,7 +887,7 @@ async function addLocation(address, lat, lng, displayName) {
     if (!res.ok) throw new Error('Error al guardar ubicación');
     locationModal.style.display = 'none';
     await loadSubitems(currentItemId);
-    loadItems(currentType); // Actualizar distancias en la lista
+    loadItems(currentType);
   } catch (error) {
     alert('Error al añadir ubicación: ' + error.message);
   }
