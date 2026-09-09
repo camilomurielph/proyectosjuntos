@@ -29,7 +29,7 @@
       <button id="logoutBtn" class="logout-btn">Cerrar sesión</button>
     </header>
 
-    <!-- FILTROS (solo visibles en Restaurantes) -->
+    <!-- FILTROS -->
     <div id="filtersBar" style="display:none; padding: 0.5rem 1rem; background: #1e1e1e; border-bottom: 1px solid #333; gap: 0.5rem; flex-wrap: wrap;">
       <button id="filterRating" class="filter-btn active" data-sort="rating">⭐ Mejor puntuación</button>
       <button id="filterDistance" class="filter-btn" data-sort="distance">📍 Más cercano</button>
@@ -103,7 +103,7 @@
         <button id="addLocationBtn" class="sub-add-btn" style="display:none;">📍 Ubicación</button>
       </div>
 
-      <!-- Modal de autocompletado para ubicación -->
+      <!-- Modal de autocompletado para ubicación (dentro del flujo) -->
       <div id="locationModal" style="display:none; background: #2a2a2a; padding: 0.8rem; border-radius: 0px; margin-bottom: 1rem;">
         <input type="text" id="locationSearchInput" placeholder="Escribe una dirección..." style="width:100%; padding:0.5rem; background:#1e1e1e; color:#e0e0e0; border:1px solid #444; border-radius:0px;">
         <div id="locationSuggestions" style="margin-top:0.5rem; max-height:150px; overflow-y:auto;"></div>
@@ -132,13 +132,21 @@
     </div>
   </div>
 
-  <!-- MODAL PARA AÑADIR ENLACE CON NOMBRE -->
-  <div id="linkModal" style="display:none; background: #2a2a2a; padding: 0.8rem; border-radius: 0px; margin-bottom: 1rem;">
-    <input type="url" id="linkUrlInput" placeholder="URL del enlace" style="width:100%; padding:0.5rem; background:#1e1e1e; color:#e0e0e0; border:1px solid #444; border-radius:0px; margin-bottom:0.5rem;">
-    <input type="text" id="linkNameInput" placeholder="Nombre del enlace (ej. Menú)" style="width:100%; padding:0.5rem; background:#1e1e1e; color:#e0e0e0; border:1px solid #444; border-radius:0px; margin-bottom:0.5rem;">
-    <div style="display:flex; gap:0.5rem;">
-      <button id="linkConfirmBtn" class="save-btn">Agregar</button>
-      <button id="linkCancelBtn" class="cancel-btn">Cancelar</button>
+  <!-- MODAL PARA AÑADIR ENLACE (INDEPENDIENTE) -->
+  <div id="linkModal" class="modal" style="align-items: center; background: rgba(0,0,0,0.8);">
+    <div class="modal-content" style="max-height: 90vh; border-radius: 0px; background: #1e1e1e; width: 95%; max-width: 400px;">
+      <header class="modal-header">
+        <h3>Añadir enlace</h3>
+        <button id="closeLinkModalBtn" class="close-btn">&times;</button>
+      </header>
+      <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+        <input type="url" id="linkUrlInput" placeholder="URL del enlace" style="width:100%; padding:0.5rem; background:#2a2a2a; color:#e0e0e0; border:1px solid #444; border-radius:0px;">
+        <input type="text" id="linkNameInput" placeholder="Nombre del enlace (ej. Menú)" style="width:100%; padding:0.5rem; background:#2a2a2a; color:#e0e0e0; border:1px solid #444; border-radius:0px;">
+        <div style="display:flex; gap:0.5rem; justify-content: flex-end;">
+          <button id="linkCancelBtn" class="cancel-btn">Cancelar</button>
+          <button id="linkConfirmBtn" class="save-btn">Agregar</button>
+        </div>
+      </div>
     </div>
   </div>
 
