@@ -504,3 +504,23 @@ header h2 { font-size: 1.2rem; }
   .sub-add-btn { min-width: 60px; font-size: 0.8rem; }
   .subitems-grid { gap: 0.5rem; }
 }
+
+/* Botones de mapa en tarjeta de ubicación */
+.map-btn {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 0.7rem;
+  border-radius: 0px;
+  color: #121212;
+}
+.google-btn {
+  background: #4285f4;
+}
+.waze-btn {
+  background: #33ccff;
+}
+.map-btn:hover {
+  opacity: 0.8;
+}
