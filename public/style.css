@@ -524,3 +524,84 @@ header h2 { font-size: 1.2rem; }
 .map-btn:hover {
   opacity: 0.8;
 }
+
+/* Redondear bordes de todos los botones */
+button,
+.save-btn,
+.cancel-btn,
+.sub-add-btn,
+.fab,
+.logout-btn,
+.tab-btn,
+.filter-btn,
+.delete-btn,
+.map-btn,
+.add-array-btn,
+.icon-btn,
+.sub-delete,
+.close-btn,
+#loginForm button {
+  border-radius: 6px !important;
+}
+
+/* Estilo consistente para botones de modales (Enlace y Ubicación) */
+#linkModal .save-btn,
+#locationModal .save-btn {
+  background-color: #bb86fc;
+  color: #121212;
+  border: none;
+  padding: 0.5rem 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+#linkModal .cancel-btn,
+#locationModal .cancel-btn {
+  background-color: #555;
+  color: #e0e0e0;
+  border: none;
+  padding: 0.5rem 1.2rem;
+  cursor: pointer;
+}
+#linkModal .save-btn:hover,
+#locationModal .save-btn:hover {
+  background-color: #a372e8;
+}
+#linkModal .cancel-btn:hover,
+#locationModal .cancel-btn:hover {
+  background-color: #666;
+}
+
+/* Botones de mapa en tarjeta de ubicación */
+.map-btn {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  color: #121212;
+  transition: opacity 0.2s;
+}
+.google-btn {
+  background: #4285f4;
+}
+.waze-btn {
+  background: #33ccff;
+}
+.map-btn:hover {
+  opacity: 0.8;
+}
+
+/* Ajuste para que los botones dentro de la tarjeta no se salgan */
+.subitem-card .sub-content .location-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.location-address {
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-align: center;
+  word-break: break-word;
+}
