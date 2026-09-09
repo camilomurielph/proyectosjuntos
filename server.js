@@ -251,75 +251,71 @@ app.get('/api/preview', isAuthenticated, async (req, res) => {
   }
 });
 
-// ===== BÚSQUEDA PREDICTIVA DE LUGARES (SOLO COLOMBIA) =====
-app.get('/api/search-places', isAuthenticated, async (req, res) => {
+// ===== ARCGIS GEOCODING =====
+const ARCGIS_URL = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer';
+
+// Sugerencias (autocompletado)
+app.get('/api/suggest', isAuthenticated, async (req, res) => {
   const { query } = req.query;
   if (!query || query.length < 2) return res.json([]);
   try {
-    // Viewbox aproximado de Cali y alrededores (Colombia)
-    // Si no encuentra, se amplía a todo Colombia con countrycodes
-    const response = await axios.get('https://nominatim.openstreetmap.org/search', {
+    const response = await axios.get(`${ARCGIS_URL}/suggest`, {
       params: {
-        q: query,
-        format: 'json',
-        limit: 5,
-        addressdetails: 1,
-        'accept-language': 'es',
-        countrycodes: 'co', // Solo Colombia
-        viewbox: '-76.6,3.6,-76.3,3.3', // Cali aproximado
-        bounded: 1 // prioriza dentro del viewbox
-      },
-      headers: { 'User-Agent': 'CompartidosApp/1.0 (https://tudominio.com)' }
+        text: query,
+        maxSuggestions: 5,
+        countryCode: 'COL', // priorizar Colombia
+        f: 'json'
+      }
     });
-    if (response.data && response.data.length > 0) {
-      const results = response.data.map(item => ({
-        label: item.display_name,
-        lat: parseFloat(item.lat),
-        lng: parseFloat(item.lon),
-        display_name: item.display_name
-      }));
-      return res.json(results);
-    }
-    // Si no encuentra, reintentar sin viewbox (todo Colombia)
-    const response2 = await axios.get('https://nominatim.openstreetmap.org/search', {
-      params: {
-        q: query,
-        format: 'json',
-        limit: 5,
-        addressdetails: 1,
-        'accept-language': 'es',
-        countrycodes: 'co'
-      },
-      headers: { 'User-Agent': 'CompartidosApp/1.0 (https://tudominio.com)' }
-    });
-    if (response2.data && response2.data.length > 0) {
-      const results = response2.data.map(item => ({
-        label: item.display_name,
-        lat: parseFloat(item.lat),
-        lng: parseFloat(item.lon),
-        display_name: item.display_name
-      }));
-      return res.json(results);
-    }
-    res.json([]);
+    const suggestions = response.data.suggestions || [];
+    res.json(suggestions);
   } catch (err) {
-    console.error('Search places error:', err.message);
-    res.status(500).json({ error: 'Error al buscar lugares' });
+    console.error('ArcGIS suggest error:', err.message);
+    res.status(500).json({ error: 'Error en sugerencias' });
   }
 });
 
-// ===== UPLOAD DE IMÁGENES (recibirá base64 de la imagen recortada) =====
+// Geocodificar dirección a coordenadas
+app.get('/api/geocode', isAuthenticated, async (req, res) => {
+  const { address, magicKey } = req.query;
+  if (!address) return res.status(400).json({ error: 'Dirección requerida' });
+  try {
+    const params = {
+      SingleLine: address,
+      countryCode: 'COL',
+      maxLocations: 1,
+      f: 'json'
+    };
+    if (magicKey) {
+      params.magicKey = magicKey;
+    }
+    const response = await axios.get(`${ARCGIS_URL}/findAddressCandidates`, { params });
+    const candidates = response.data.candidates || [];
+    if (candidates.length === 0) {
+      return res.status(404).json({ error: 'Dirección no encontrada' });
+    }
+    const { location, address: formattedAddress } = candidates[0];
+    res.json({
+      lat: location.y,
+      lng: location.x,
+      display_name: formattedAddress || address
+    });
+  } catch (err) {
+    console.error('ArcGIS geocode error:', err.message);
+    res.status(500).json({ error: 'Error al geocodificar' });
+  }
+});
+
+// ===== UPLOAD DE IMÁGENES =====
 app.post('/api/upload', isAuthenticated, async (req, res) => {
   try {
     const { image } = req.body;
     if (!image) return res.status(400).json({ error: 'No se recibió imagen' });
-    // Eliminar el prefijo data:image/webp;base64,
     const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
     const timestamp = Date.now();
     const filename = `${timestamp}-${Math.random().toString(36).substring(7)}.webp`;
     const outputPath = path.join(uploadsDir, filename);
-    // Ya viene recortada y cuadrada, solo redimensionamos a 800x800 y convertimos a webp
     await sharp(buffer)
       .resize(800, 800, { fit: 'cover' })
       .webp({ quality: 80 })
