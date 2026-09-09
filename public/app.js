@@ -51,8 +51,9 @@ const locationSearchInput = document.getElementById('locationSearchInput');
 const locationSuggestions = document.getElementById('locationSuggestions');
 const cancelLocationBtn = document.getElementById('cancelLocationBtn');
 
-// Link modal
+// Link modal (independiente)
 const linkModal = document.getElementById('linkModal');
+const closeLinkModalBtn = document.getElementById('closeLinkModalBtn');
 const linkUrlInput = document.getElementById('linkUrlInput');
 const linkNameInput = document.getElementById('linkNameInput');
 const linkConfirmBtn = document.getElementById('linkConfirmBtn');
@@ -407,7 +408,7 @@ async function openBoard(item) {
 
   // Ocultar modales secundarios
   locationModal.style.display = 'none';
-  linkModal.style.display = 'none';
+  linkModal.classList.remove('active');
   cropModal.classList.remove('active');
 
   await loadSubitems(item.id);
@@ -497,7 +498,7 @@ closeModalBtn.addEventListener('click', () => {
   itemModal.classList.remove('active');
   currentItemId = null;
   locationModal.style.display = 'none';
-  linkModal.style.display = 'none';
+  linkModal.classList.remove('active');
   cropModal.classList.remove('active');
 });
 itemModal.addEventListener('click', (e) => {
@@ -505,7 +506,7 @@ itemModal.addEventListener('click', (e) => {
     itemModal.classList.remove('active');
     currentItemId = null;
     locationModal.style.display = 'none';
-    linkModal.style.display = 'none';
+    linkModal.classList.remove('active');
     cropModal.classList.remove('active');
   }
 });
@@ -607,16 +608,22 @@ addNoteBtn.addEventListener('click', async () => {
   }
 });
 
-// Enlace con nombre
+// Enlace (modal independiente)
 addLinkBtn.addEventListener('click', () => {
-  linkModal.style.display = 'block';
+  linkModal.classList.add('active');
   linkUrlInput.value = '';
   linkNameInput.value = '';
   linkUrlInput.focus();
 });
 
-linkCancelBtn.addEventListener('click', () => {
-  linkModal.style.display = 'none';
+function closeLinkModal() {
+  linkModal.classList.remove('active');
+}
+
+closeLinkModalBtn.addEventListener('click', closeLinkModal);
+linkCancelBtn.addEventListener('click', closeLinkModal);
+linkModal.addEventListener('click', (e) => {
+  if (e.target === linkModal) closeLinkModal();
 });
 
 linkConfirmBtn.addEventListener('click', async () => {
@@ -626,14 +633,13 @@ linkConfirmBtn.addEventListener('click', async () => {
   if (!name) return alert('El nombre es obligatorio');
   try {
     const metadata = { name: name, url: url };
-    // Opcional: obtener preview para enriquecer (pero no lo usamos en la tarjeta)
     const res = await fetch(`/api/items/${currentItemId}/subitems`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'link', content: url, metadata })
     });
     if (!res.ok) throw new Error('Error al añadir enlace');
-    linkModal.style.display = 'none';
+    closeLinkModal();
     await loadSubitems(currentItemId);
   } catch (error) {
     alert('Error al añadir enlace: ' + error.message);
@@ -643,12 +649,11 @@ linkConfirmBtn.addEventListener('click', async () => {
 // Imagen con recorte
 let cropImageFile = null;
 let cropImageDataUrl = null;
-let cropRect = { x: 0, y: 0, size: 200 }; // tamaño en píxeles del canvas
+let cropRect = { x: 0, y: 0, size: 200 };
 let isDragging = false;
 let dragStartX, dragStartY;
 
 addImageBtn.addEventListener('click', () => {
-  // Crear un input de archivo temporal
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
@@ -668,12 +673,10 @@ addImageBtn.addEventListener('click', () => {
 
 function openCropModal() {
   cropModal.classList.add('active');
-  // Dibujar imagen en canvas
   const img = new Image();
   img.onload = () => {
     const canvas = cropCanvas;
     const ctx = canvas.getContext('2d');
-    // Ajustar tamaño del canvas para que quepa en la vista
     const maxWidth = cropModal.querySelector('.modal-content').clientWidth - 40;
     const maxHeight = window.innerHeight * 0.6;
     let width = img.width;
@@ -690,9 +693,7 @@ function openCropModal() {
     }
     canvas.width = width;
     canvas.height = height;
-    // Dibujar imagen
     ctx.drawImage(img, 0, 0, width, height);
-    // Inicializar rectángulo de recorte (cuadrado en el centro)
     const size = Math.min(width, height) * 0.6;
     cropRect = {
       x: (width - size) / 2,
@@ -711,13 +712,11 @@ function drawCrop() {
   img.onload = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    // Dibujar overlay oscuro fuera del cuadrado
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(0, 0, canvas.width, cropRect.y);
     ctx.fillRect(0, cropRect.y + cropRect.size, canvas.width, canvas.height - cropRect.y - cropRect.size);
     ctx.fillRect(0, cropRect.y, cropRect.x, cropRect.size);
     ctx.fillRect(cropRect.x + cropRect.size, cropRect.y, canvas.width - cropRect.x - cropRect.size, cropRect.size);
-    // Borde del cuadrado
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
     ctx.strokeRect(cropRect.x, cropRect.y, cropRect.size, cropRect.size);
@@ -725,12 +724,11 @@ function drawCrop() {
   img.src = cropImageDataUrl;
 }
 
-// Eventos para arrastrar el cuadrado de recorte
+// Eventos para arrastrar el cuadrado
 cropCanvas.addEventListener('mousedown', (e) => {
   const rect = cropCanvas.getBoundingClientRect();
   const mouseX = (e.clientX - rect.left) * (cropCanvas.width / rect.width);
   const mouseY = (e.clientY - rect.top) * (cropCanvas.height / rect.height);
-  // Verificar si el clic está dentro del cuadrado
   if (mouseX >= cropRect.x && mouseX <= cropRect.x + cropRect.size &&
       mouseY >= cropRect.y && mouseY <= cropRect.y + cropRect.size) {
     isDragging = true;
@@ -759,7 +757,6 @@ window.addEventListener('mousemove', (e) => {
   const mouseY = (e.clientY - rect.top) * (cropCanvas.height / rect.height);
   let newX = mouseX - dragStartX;
   let newY = mouseY - dragStartY;
-  // Limitar al canvas
   newX = Math.max(0, Math.min(cropCanvas.width - cropRect.size, newX));
   newY = Math.max(0, Math.min(cropCanvas.height - cropRect.size, newY));
   cropRect.x = newX;
@@ -789,11 +786,9 @@ window.addEventListener('touchend', () => {
   isDragging = false;
 });
 
-// Confirmar recorte
 cropConfirmBtn.addEventListener('click', async () => {
   const canvas = cropCanvas;
   const ctx = canvas.getContext('2d');
-  // Recortar la región del cuadrado
   const imageData = ctx.getImageData(cropRect.x, cropRect.y, cropRect.size, cropRect.size);
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = cropRect.size;
@@ -801,7 +796,6 @@ cropConfirmBtn.addEventListener('click', async () => {
   const tempCtx = tempCanvas.getContext('2d');
   tempCtx.putImageData(imageData, 0, 0);
   const croppedDataUrl = tempCanvas.toDataURL('image/webp', 0.9);
-  // Subir la imagen recortada
   try {
     const res = await fetch('/api/upload', {
       method: 'POST',
