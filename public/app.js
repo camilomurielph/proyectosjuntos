@@ -138,7 +138,6 @@ function updateRatingsDisplay(itemData) {
       </div>
     `).join('');
   }
-  // Actualizar mi puntuación
   const myRating = ratings[currentUser] || 0;
   starsContainer.textContent = renderStars(myRating);
   ratingInfo.textContent = myRating > 0 ? `Tu puntuación: ${myRating}/5` : 'Puntúa este restaurante';
@@ -876,9 +875,12 @@ window.addEventListener('mouseup', handleEnd);
 window.addEventListener('touchend', handleEnd);
 window.addEventListener('touchcancel', handleEnd);
 
-// Control deslizante para el tamaño del cuadrado
-let sliderExists = document.getElementById('cropSizeSlider');
-if (!sliderExists) {
+// Control deslizante para el tamaño del cuadrado - corregido
+function initCropSlider() {
+  // Eliminar slider existente si ya hay uno para evitar duplicados
+  const oldSlider = document.getElementById('cropSizeSlider');
+  if (oldSlider) oldSlider.remove();
+
   const sizeSlider = document.createElement('input');
   sizeSlider.type = 'range';
   sizeSlider.id = 'cropSizeSlider';
@@ -889,9 +891,16 @@ if (!sliderExists) {
   sizeSlider.style.marginTop = '0.5rem';
   sizeSlider.style.background = '#333';
   sizeSlider.style.accentColor = '#bb86fc';
-  const cropControls = document.querySelector('#cropModal .modal-content');
-  const confirmBtn = document.getElementById('cropConfirmBtn');
-  cropControls.insertBefore(sizeSlider, confirmBtn);
+
+  // Buscar el contenedor de los botones dentro del modal de crop
+  const modalContent = document.querySelector('#cropModal .modal-content');
+  const buttonsDiv = modalContent.querySelector('div:last-child'); // el div que contiene los botones de recortar/cancelar
+  if (buttonsDiv) {
+    modalContent.insertBefore(sizeSlider, buttonsDiv);
+  } else {
+    // Fallback: agregar al final
+    modalContent.appendChild(sizeSlider);
+  }
 
   sizeSlider.addEventListener('input', () => {
     const percent = parseInt(sizeSlider.value) / 100;
@@ -903,6 +912,21 @@ if (!sliderExists) {
     drawCrop();
   });
 }
+
+// Inicializar slider cuando el modal de crop esté listo
+// Se llamará cada vez que se abra el modal de crop, pero solo creará si no existe
+function ensureCropSlider() {
+  if (!document.getElementById('cropSizeSlider')) {
+    initCropSlider();
+  }
+}
+
+// Llamar a ensureCropSlider al abrir el crop modal
+const originalOpenCrop = openCropModal;
+openCropModal = function() {
+  originalOpenCrop();
+  setTimeout(ensureCropSlider, 100);
+};
 
 cropConfirmBtn.addEventListener('click', async () => {
   const canvas = cropCanvas;
@@ -948,18 +972,21 @@ closeCropBtn.addEventListener('click', () => {
 // ===== Ubicación con autocompletado (modal independiente) =====
 let locationSearchTimeout = null;
 
-// Asegurar que el botón existe y tiene un listener
-if (addLocationBtn) {
-  addLocationBtn.addEventListener('click', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    locationModal.classList.add('active');
-    locationSearchInput.value = '';
-    locationSuggestions.innerHTML = '';
-    setTimeout(() => locationSearchInput.focus(), 100);
-  });
-} else {
-  console.warn('Botón de ubicación no encontrado en el DOM');
+// Asignar evento al botón de ubicación de manera robusta
+function setupLocationButton() {
+  if (addLocationBtn) {
+    addLocationBtn.removeEventListener('click', locationClickHandler);
+    addLocationBtn.addEventListener('click', locationClickHandler);
+  }
+}
+
+function locationClickHandler(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  locationModal.classList.add('active');
+  locationSearchInput.value = '';
+  locationSuggestions.innerHTML = '';
+  setTimeout(() => locationSearchInput.focus(), 100);
 }
 
 function closeLocationModal() {
@@ -1017,6 +1044,15 @@ async function addLocation(address, lat, lng, displayName) {
     alert('Error al añadir ubicación: ' + error.message);
   }
 }
+
+// Llamar a setupLocationButton al cargar y cada vez que se abra un tablero (por si el botón se regenera)
+setupLocationButton();
+// También configurar después de cada apertura de tablero para estar seguros
+const originalOpenBoard = openBoard;
+openBoard = async function(item) {
+  await originalOpenBoard(item);
+  setTimeout(setupLocationButton, 50);
+};
 
 // ========== Inicialización ==========
 checkSession();
