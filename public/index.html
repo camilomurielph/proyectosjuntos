@@ -79,7 +79,7 @@
         </div>
       </div>
 
-      <!-- Puntuación con estrellas (solo para restaurantes) -->
+      <!-- Puntuación con estrellas -->
       <div id="ratingArea" style="display:none; margin-bottom: 1rem;">
         <div style="font-weight: bold; color: #aaa; margin-bottom: 0.3rem;">Puntuaciones:</div>
         <div id="ratingsDisplay"></div>
@@ -101,13 +101,6 @@
         <button id="addLinkBtn" class="sub-add-btn">🔗 Enlace</button>
         <button id="addImageBtn" class="sub-add-btn">🖼️ Imagen</button>
         <button id="addLocationBtn" class="sub-add-btn" style="display:none;">📍 Ubicación</button>
-      </div>
-
-      <!-- Modal de autocompletado para ubicación (dentro del flujo) -->
-      <div id="locationModal" style="display:none; background: #2a2a2a; padding: 0.8rem; border-radius: 0px; margin-bottom: 1rem;">
-        <input type="text" id="locationSearchInput" placeholder="Escribe una dirección..." style="width:100%; padding:0.5rem; background:#1e1e1e; color:#e0e0e0; border:1px solid #444; border-radius:0px;">
-        <div id="locationSuggestions" style="margin-top:0.5rem; max-height:150px; overflow-y:auto;"></div>
-        <button id="cancelLocationBtn" class="cancel-btn small" style="margin-top:0.5rem;">Cancelar</button>
       </div>
 
       <!-- Eliminar item -->
@@ -145,6 +138,23 @@
         <div style="display:flex; gap:0.5rem; justify-content: flex-end;">
           <button id="linkCancelBtn" class="cancel-btn">Cancelar</button>
           <button id="linkConfirmBtn" class="save-btn">Agregar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PARA UBICACIÓN (INDEPENDIENTE) -->
+  <div id="locationModal" class="modal" style="align-items: center; background: rgba(0,0,0,0.8);">
+    <div class="modal-content" style="max-height: 90vh; border-radius: 0px; background: #1e1e1e; width: 95%; max-width: 400px;">
+      <header class="modal-header">
+        <h3>Buscar ubicación</h3>
+        <button id="closeLocationModalBtn" class="close-btn">&times;</button>
+      </header>
+      <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+        <input type="text" id="locationSearchInput" placeholder="Escribe una dirección..." style="width:100%; padding:0.5rem; background:#2a2a2a; color:#e0e0e0; border:1px solid #444; border-radius:0px;">
+        <div id="locationSuggestions" style="margin-top:0.5rem; max-height:150px; overflow-y:auto;"></div>
+        <div style="display:flex; gap:0.5rem; justify-content: flex-end;">
+          <button id="locationCancelBtn" class="cancel-btn">Cancelar</button>
         </div>
       </div>
     </div>
