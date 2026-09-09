@@ -143,9 +143,9 @@
     </div>
   </div>
 
-  <!-- MODAL PARA UBICACIÓN (CON AUTOCOMPLETADO ARCGIS) -->
+  <!-- MODAL PARA UBICACIÓN (CON AUTOCOMPLETADO ARCGIS) - CON ALTURA AJUSTADA -->
   <div id="locationModal" class="modal" style="align-items: center; background: rgba(0,0,0,0.8);">
-    <div class="modal-content" style="max-height: 90vh; border-radius: 6px; background: #1e1e1e; width: 95%; max-width: 400px;">
+    <div class="modal-content" style="max-height: 90vh; border-radius: 6px; background: #1e1e1e; width: 95%; max-width: 400px; padding: 1.2rem 1.2rem 1.5rem;">
       <header class="modal-header">
         <h3>Agregar ubicación</h3>
         <button id="closeLocationModalBtn" class="close-btn">&times;</button>
@@ -153,7 +153,7 @@
       <div style="display: flex; flex-direction: column; gap: 0.8rem;">
         <div style="position: relative;">
           <input type="text" id="locationInput" placeholder="Escribe una dirección..." style="width:100%; padding:0.5rem; background:#2a2a2a; color:#e0e0e0; border:1px solid #444; border-radius:6px;">
-          <div id="suggestionsList" style="position: absolute; top: 100%; left: 0; right: 0; background: #2a2a2a; border: 1px solid #444; border-top: none; max-height: 150px; overflow-y: auto; display: none; z-index: 10; border-radius: 0 0 6px 6px;"></div>
+          <div id="suggestionsList" style="position: absolute; top: 100%; left: 0; right: 0; background: #2a2a2a; border: 1px solid #444; border-top: none; max-height: 250px; overflow-y: auto; display: none; z-index: 10; border-radius: 0 0 6px 6px;"></div>
         </div>
         <div style="display:flex; gap:0.5rem; justify-content: flex-end;">
           <button id="locationCancelBtn" class="cancel-btn">Cancelar</button>
