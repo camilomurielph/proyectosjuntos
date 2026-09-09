@@ -81,11 +81,15 @@
 
       <!-- Puntuación con estrellas (solo para restaurantes) -->
       <div id="ratingArea" style="display:none; margin-bottom: 1rem;">
-        <span style="font-weight: bold; color: #aaa;">Tu puntuación:</span>
-        <span id="starsContainer" style="font-size: 1.8rem; cursor: pointer; margin-left: 0.5rem;">
-          ☆☆☆☆☆
-        </span>
-        <span id="ratingInfo" style="font-size: 0.9rem; color: #888; margin-left: 0.5rem;"></span>
+        <div style="font-weight: bold; color: #aaa; margin-bottom: 0.3rem;">Puntuaciones:</div>
+        <div id="ratingsDisplay"></div>
+        <div style="margin-top: 0.5rem;">
+          <span style="font-weight: bold; color: #aaa;">Tu puntuación:</span>
+          <span id="starsContainer" style="font-size: 1.8rem; cursor: pointer; margin-left: 0.5rem;">
+            ☆☆☆☆☆
+          </span>
+          <span id="ratingInfo" style="font-size: 0.9rem; color: #888; margin-left: 0.5rem;"></span>
+        </div>
       </div>
 
       <!-- Lista de subitems en grid -->
@@ -97,18 +101,44 @@
         <button id="addLinkBtn" class="sub-add-btn">🔗 Enlace</button>
         <button id="addImageBtn" class="sub-add-btn">🖼️ Imagen</button>
         <button id="addLocationBtn" class="sub-add-btn" style="display:none;">📍 Ubicación</button>
-        <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
       </div>
 
       <!-- Modal de autocompletado para ubicación -->
-      <div id="locationModal" style="display:none; background: #2a2a2a; padding: 0.8rem; border-radius: 8px; margin-bottom: 1rem;">
-        <input type="text" id="locationSearchInput" placeholder="Escribe una dirección..." style="width:100%; padding:0.5rem; background:#1e1e1e; color:#e0e0e0; border:1px solid #444; border-radius:4px;">
+      <div id="locationModal" style="display:none; background: #2a2a2a; padding: 0.8rem; border-radius: 0px; margin-bottom: 1rem;">
+        <input type="text" id="locationSearchInput" placeholder="Escribe una dirección..." style="width:100%; padding:0.5rem; background:#1e1e1e; color:#e0e0e0; border:1px solid #444; border-radius:0px;">
         <div id="locationSuggestions" style="margin-top:0.5rem; max-height:150px; overflow-y:auto;"></div>
         <button id="cancelLocationBtn" class="cancel-btn small" style="margin-top:0.5rem;">Cancelar</button>
       </div>
 
       <!-- Eliminar item -->
       <button id="deleteItemBtn" class="delete-btn full">Eliminar este item</button>
+    </div>
+  </div>
+
+  <!-- MODAL PARA RECORTE DE IMAGEN -->
+  <div id="cropModal" class="modal" style="align-items: center; background: rgba(0,0,0,0.9);">
+    <div class="modal-content" style="max-height: 90vh; border-radius: 0px; background: #1e1e1e; width: 95%; max-width: 500px;">
+      <header class="modal-header">
+        <h3>Recortar imagen</h3>
+        <button id="closeCropBtn" class="close-btn">&times;</button>
+      </header>
+      <div style="position: relative; width: 100%; display: flex; justify-content: center;">
+        <canvas id="cropCanvas" style="max-width: 100%; max-height: 60vh; background: #000;"></canvas>
+      </div>
+      <div style="display: flex; gap: 0.5rem; margin-top: 0.8rem; justify-content: center;">
+        <button id="cropConfirmBtn" class="save-btn">Recortar y subir</button>
+        <button id="cropCancelBtn" class="cancel-btn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PARA AÑADIR ENLACE CON NOMBRE -->
+  <div id="linkModal" style="display:none; background: #2a2a2a; padding: 0.8rem; border-radius: 0px; margin-bottom: 1rem;">
+    <input type="url" id="linkUrlInput" placeholder="URL del enlace" style="width:100%; padding:0.5rem; background:#1e1e1e; color:#e0e0e0; border:1px solid #444; border-radius:0px; margin-bottom:0.5rem;">
+    <input type="text" id="linkNameInput" placeholder="Nombre del enlace (ej. Menú)" style="width:100%; padding:0.5rem; background:#1e1e1e; color:#e0e0e0; border:1px solid #444; border-radius:0px; margin-bottom:0.5rem;">
+    <div style="display:flex; gap:0.5rem;">
+      <button id="linkConfirmBtn" class="save-btn">Agregar</button>
+      <button id="linkCancelBtn" class="cancel-btn">Cancelar</button>
     </div>
   </div>
 
