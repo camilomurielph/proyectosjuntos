@@ -143,18 +143,18 @@
     </div>
   </div>
 
-  <!-- MODAL PARA UBICACIÓN (INDEPENDIENTE) -->
+  <!-- MODAL PARA UBICACIÓN (INDEPENDIENTE) - AHORA SIN AUTOCOMPLETADO -->
   <div id="locationModal" class="modal" style="align-items: center; background: rgba(0,0,0,0.8);">
     <div class="modal-content" style="max-height: 90vh; border-radius: 0px; background: #1e1e1e; width: 95%; max-width: 400px;">
       <header class="modal-header">
-        <h3>Buscar ubicación</h3>
+        <h3>Agregar ubicación</h3>
         <button id="closeLocationModalBtn" class="close-btn">&times;</button>
       </header>
       <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-        <input type="text" id="locationSearchInput" placeholder="Escribe una dirección..." style="width:100%; padding:0.5rem; background:#2a2a2a; color:#e0e0e0; border:1px solid #444; border-radius:0px;">
-        <div id="locationSuggestions" style="margin-top:0.5rem; max-height:150px; overflow-y:auto;"></div>
+        <input type="text" id="locationInput" placeholder="Escribe la dirección (ej. Calle 4 # 26-21)" style="width:100%; padding:0.5rem; background:#2a2a2a; color:#e0e0e0; border:1px solid #444; border-radius:0px;">
         <div style="display:flex; gap:0.5rem; justify-content: flex-end;">
           <button id="locationCancelBtn" class="cancel-btn">Cancelar</button>
+          <button id="locationConfirmBtn" class="save-btn">Agregar</button>
         </div>
       </div>
     </div>
