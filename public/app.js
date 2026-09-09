@@ -229,6 +229,7 @@ async function loadItems(type) {
     const res = await fetch(`/api/items?type=${encodeURIComponent(type)}`);
     if (!res.ok) throw new Error('Error al cargar');
     items = await res.json();
+    // Calcular distancia para restaurantes si tenemos posición
     if (type === 'restaurante' && userPosition) {
       for (let item of items) {
         const subRes = await fetch(`/api/items/${item.id}/subitems`);
@@ -241,6 +242,8 @@ async function loadItems(type) {
               locationSub.metadata.lat, locationSub.metadata.lng
             );
             item.distance = dist;
+          } else {
+            item.distance = null; // Sin coordenadas
           }
         }
       }
@@ -264,8 +267,8 @@ function renderItemsWithSort(itemsData, sortBy) {
       });
     } else if (sortBy === 'distance') {
       sorted.sort((a, b) => {
-        const aDist = a.distance !== undefined ? a.distance : Infinity;
-        const bDist = b.distance !== undefined ? b.distance : Infinity;
+        const aDist = a.distance !== undefined && a.distance !== null ? a.distance : Infinity;
+        const bDist = b.distance !== undefined && b.distance !== null ? b.distance : Infinity;
         return aDist - bDist;
       });
     }
@@ -288,7 +291,7 @@ function renderItems(itemsData) {
       const avg = values.length ? (values.reduce((s, v) => s + v, 0) / values.length) : 0;
       const stars = avg > 0 ? `⭐ ${avg.toFixed(1)}` : 'Sin puntuar';
       let distHtml = '';
-      if (item.distance !== undefined && item.distance !== Infinity) {
+      if (item.distance !== undefined && item.distance !== null && item.distance !== Infinity) {
         distHtml = `📍 ${item.distance.toFixed(1)} km`;
       } else {
         distHtml = '📍 Sin ubicación';
@@ -436,10 +439,8 @@ function renderSubitems(subitemsData) {
       contentHtml = `<img src="${escapeHtml(sub.content)}" alt="Imagen" loading="lazy">`;
     } else if (sub.type === 'location') {
       const address = sub.content;
-      // Enlaces que intentan abrir la app directamente
       const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-      const wazeUrl = `waze://?q=${encodeURIComponent(address)}&navigate=yes`; // intenta abrir app
-      // fallback web para waze si no tiene app
+      const wazeUrl = `waze://?q=${encodeURIComponent(address)}&navigate=yes`;
       const wazeWebUrl = `https://www.waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`;
       contentHtml = `
         <div class="location-card">
@@ -953,7 +954,7 @@ closeCropBtn.addEventListener('click', () => {
   cropModal.classList.remove('active');
 });
 
-// ===== Ubicación (texto libre + botón de mapa) =====
+// ===== Ubicación (con geocodificación para mostrar distancia) =====
 function setupLocationButton() {
   if (addLocationBtn) {
     addLocationBtn.removeEventListener('click', locationClickHandler);
@@ -966,11 +967,15 @@ function locationClickHandler(e) {
   e.stopPropagation();
   locationModal.classList.add('active');
   locationInput.value = '';
+  locationConfirmBtn.textContent = 'Agregar';
+  locationConfirmBtn.disabled = false;
   setTimeout(() => locationInput.focus(), 100);
 }
 
 function closeLocationModal() {
   locationModal.classList.remove('active');
+  locationConfirmBtn.textContent = 'Agregar';
+  locationConfirmBtn.disabled = false;
 }
 
 closeLocationModalBtn.addEventListener('click', closeLocationModal);
@@ -982,8 +987,30 @@ locationModal.addEventListener('click', (e) => {
 locationConfirmBtn.addEventListener('click', async () => {
   const address = locationInput.value.trim();
   if (!address) return alert('Por favor ingresa una dirección');
+  
+  // Mostrar estado de carga
+  locationConfirmBtn.textContent = 'Geocodificando...';
+  locationConfirmBtn.disabled = true;
+  
   try {
-    const metadata = { address: address };
+    // Intentar geocodificar
+    let metadata = { address: address };
+    try {
+      const geoRes = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
+      if (geoRes.ok) {
+        const geoData = await geoRes.json();
+        if (geoData.lat && geoData.lng) {
+          metadata.lat = geoData.lat;
+          metadata.lng = geoData.lng;
+          metadata.display_name = geoData.display_name || address;
+          console.log(`📍 Geocodificado: ${address} → (${geoData.lat}, ${geoData.lng})`);
+        }
+      }
+    } catch (geoError) {
+      console.warn('Geocodificación fallida:', geoError);
+    }
+    
+    // Guardar subitem con (o sin) coordenadas
     const res = await fetch(`/api/items/${currentItemId}/subitems`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -994,11 +1021,15 @@ locationConfirmBtn.addEventListener('click', async () => {
       })
     });
     if (!res.ok) throw new Error('Error al guardar ubicación');
+    
     closeLocationModal();
     await loadSubitems(currentItemId);
-    loadItems(currentType);
+    loadItems(currentType); // actualizar lista con distancia
   } catch (error) {
     alert('Error al añadir ubicación: ' + error.message);
+  } finally {
+    locationConfirmBtn.textContent = 'Agregar';
+    locationConfirmBtn.disabled = false;
   }
 });
 
