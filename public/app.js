@@ -646,12 +646,14 @@ linkConfirmBtn.addEventListener('click', async () => {
   }
 });
 
-// Imagen con recorte
+// ===== Recorte de imagen con redimensionamiento =====
 let cropImageFile = null;
 let cropImageDataUrl = null;
 let cropRect = { x: 0, y: 0, size: 200 };
 let isDragging = false;
-let dragStartX, dragStartY;
+let isResizing = false;
+let dragStartX, dragStartY, dragStartSize;
+let cropCanvasWidth = 0, cropCanvasHeight = 0;
 
 addImageBtn.addEventListener('click', () => {
   const input = document.createElement('input');
@@ -677,7 +679,8 @@ function openCropModal() {
   img.onload = () => {
     const canvas = cropCanvas;
     const ctx = canvas.getContext('2d');
-    const maxWidth = cropModal.querySelector('.modal-content').clientWidth - 40;
+    const modalContent = cropModal.querySelector('.modal-content');
+    const maxWidth = modalContent.clientWidth - 40;
     const maxHeight = window.innerHeight * 0.6;
     let width = img.width;
     let height = img.height;
@@ -693,13 +696,22 @@ function openCropModal() {
     }
     canvas.width = width;
     canvas.height = height;
+    cropCanvasWidth = width;
+    cropCanvasHeight = height;
     ctx.drawImage(img, 0, 0, width, height);
+    // Inicializar rectángulo de recorte: cuadrado del 60% del tamaño del canvas
     const size = Math.min(width, height) * 0.6;
     cropRect = {
       x: (width - size) / 2,
       y: (height - size) / 2,
       size: size
     };
+    // Actualizar slider
+    const slider = document.getElementById('cropSizeSlider');
+    if (slider) {
+      const percent = (size / Math.min(width, height)) * 100;
+      slider.value = Math.min(100, Math.max(20, percent));
+    }
     drawCrop();
   };
   img.src = cropImageDataUrl;
@@ -712,79 +724,206 @@ function drawCrop() {
   img.onload = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    // Overlay oscuro fuera del cuadrado
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(0, 0, canvas.width, cropRect.y);
     ctx.fillRect(0, cropRect.y + cropRect.size, canvas.width, canvas.height - cropRect.y - cropRect.size);
     ctx.fillRect(0, cropRect.y, cropRect.x, cropRect.size);
     ctx.fillRect(cropRect.x + cropRect.size, cropRect.y, canvas.width - cropRect.x - cropRect.size, cropRect.size);
+    // Borde del cuadrado
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
     ctx.strokeRect(cropRect.x, cropRect.y, cropRect.size, cropRect.size);
+    // Dibujar manejadores de esquina (pequeños cuadrados)
+    const handleSize = 8;
+    const corners = [
+      [cropRect.x, cropRect.y],
+      [cropRect.x + cropRect.size - handleSize, cropRect.y],
+      [cropRect.x, cropRect.y + cropRect.size - handleSize],
+      [cropRect.x + cropRect.size - handleSize, cropRect.y + cropRect.size - handleSize]
+    ];
+    ctx.fillStyle = '#fff';
+    corners.forEach(([cx, cy]) => {
+      ctx.fillRect(cx, cy, handleSize, handleSize);
+    });
   };
   img.src = cropImageDataUrl;
 }
 
-// Eventos para arrastrar el cuadrado
-cropCanvas.addEventListener('mousedown', (e) => {
+// Eventos de ratón/touch para arrastrar y redimensionar
+function getMousePos(e) {
   const rect = cropCanvas.getBoundingClientRect();
-  const mouseX = (e.clientX - rect.left) * (cropCanvas.width / rect.width);
-  const mouseY = (e.clientY - rect.top) * (cropCanvas.height / rect.height);
-  if (mouseX >= cropRect.x && mouseX <= cropRect.x + cropRect.size &&
-      mouseY >= cropRect.y && mouseY <= cropRect.y + cropRect.size) {
-    isDragging = true;
-    dragStartX = mouseX - cropRect.x;
-    dragStartY = mouseY - cropRect.y;
-    cropCanvas.style.cursor = 'move';
+  const scaleX = cropCanvas.width / rect.width;
+  const scaleY = cropCanvas.height / rect.height;
+  let clientX, clientY;
+  if (e.touches) {
+    clientX = e.touches[0].clientX;
+    clientY = e.touches[0].clientY;
+  } else {
+    clientX = e.clientX;
+    clientY = e.clientY;
   }
-});
-cropCanvas.addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  const touch = e.touches[0];
-  const rect = cropCanvas.getBoundingClientRect();
-  const mouseX = (touch.clientX - rect.left) * (cropCanvas.width / rect.width);
-  const mouseY = (touch.clientY - rect.top) * (cropCanvas.height / rect.height);
-  if (mouseX >= cropRect.x && mouseX <= cropRect.x + cropRect.size &&
-      mouseY >= cropRect.y && mouseY <= cropRect.y + cropRect.size) {
-    isDragging = true;
-    dragStartX = mouseX - cropRect.x;
-    dragStartY = mouseY - cropRect.y;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY
+  };
+}
+
+function isOnCorner(pos) {
+  const handleSize = 12; // tamaño de la zona de captura
+  const corners = [
+    [cropRect.x, cropRect.y],
+    [cropRect.x + cropRect.size, cropRect.y],
+    [cropRect.x, cropRect.y + cropRect.size],
+    [cropRect.x + cropRect.size, cropRect.y + cropRect.size]
+  ];
+  for (let i = 0; i < corners.length; i++) {
+    const [cx, cy] = corners[i];
+    if (pos.x >= cx - handleSize/2 && pos.x <= cx + handleSize/2 &&
+        pos.y >= cy - handleSize/2 && pos.y <= cy + handleSize/2) {
+      return i; // 0: superior-izquierda, 1: superior-derecha, 2: inferior-izquierda, 3: inferior-derecha
+    }
   }
-});
-window.addEventListener('mousemove', (e) => {
-  if (!isDragging) return;
-  const rect = cropCanvas.getBoundingClientRect();
-  const mouseX = (e.clientX - rect.left) * (cropCanvas.width / rect.width);
-  const mouseY = (e.clientY - rect.top) * (cropCanvas.height / rect.height);
-  let newX = mouseX - dragStartX;
-  let newY = mouseY - dragStartY;
-  newX = Math.max(0, Math.min(cropCanvas.width - cropRect.size, newX));
-  newY = Math.max(0, Math.min(cropCanvas.height - cropRect.size, newY));
-  cropRect.x = newX;
-  cropRect.y = newY;
-  drawCrop();
-});
-window.addEventListener('touchmove', (e) => {
-  if (!isDragging) return;
+  return -1;
+}
+
+function isInsideRect(pos) {
+  return pos.x >= cropRect.x && pos.x <= cropRect.x + cropRect.size &&
+         pos.y >= cropRect.y && pos.y <= cropRect.y + cropRect.size;
+}
+
+function handleStart(e) {
   e.preventDefault();
-  const touch = e.touches[0];
-  const rect = cropCanvas.getBoundingClientRect();
-  const mouseX = (touch.clientX - rect.left) * (cropCanvas.width / rect.width);
-  const mouseY = (touch.clientY - rect.top) * (cropCanvas.height / rect.height);
-  let newX = mouseX - dragStartX;
-  let newY = mouseY - dragStartY;
-  newX = Math.max(0, Math.min(cropCanvas.width - cropRect.size, newX));
-  newY = Math.max(0, Math.min(cropCanvas.height - cropRect.size, newY));
-  cropRect.x = newX;
-  cropRect.y = newY;
-  drawCrop();
-});
-window.addEventListener('mouseup', () => {
+  const pos = getMousePos(e);
+  const corner = isOnCorner(pos);
+  if (corner !== -1) {
+    isResizing = true;
+    dragStartX = pos.x;
+    dragStartY = pos.y;
+    dragStartSize = cropRect.size;
+    // Guardar la esquina que se está arrastrando
+    cropRect._corner = corner;
+    return;
+  }
+  if (isInsideRect(pos)) {
+    isDragging = true;
+    dragStartX = pos.x - cropRect.x;
+    dragStartY = pos.y - cropRect.y;
+  }
+}
+
+function handleMove(e) {
+  e.preventDefault();
+  const pos = getMousePos(e);
+  if (isResizing) {
+    // Redimensionar desde la esquina
+    const corner = cropRect._corner;
+    let newSize = cropRect.size;
+    let newX = cropRect.x;
+    let newY = cropRect.y;
+    // Calcular nuevo tamaño basado en la distancia desde la esquina opuesta
+    if (corner === 0) { // superior-izquierda
+      const dx = cropRect.x + cropRect.size - pos.x;
+      const dy = cropRect.y + cropRect.size - pos.y;
+      newSize = Math.min(dx, dy);
+      newSize = Math.max(20, newSize);
+      newX = cropRect.x + cropRect.size - newSize;
+      newY = cropRect.y + cropRect.size - newSize;
+    } else if (corner === 1) { // superior-derecha
+      const dx = pos.x - cropRect.x;
+      const dy = cropRect.y + cropRect.size - pos.y;
+      newSize = Math.min(dx, dy);
+      newSize = Math.max(20, newSize);
+      newX = cropRect.x;
+      newY = cropRect.y + cropRect.size - newSize;
+    } else if (corner === 2) { // inferior-izquierda
+      const dx = cropRect.x + cropRect.size - pos.x;
+      const dy = pos.y - cropRect.y;
+      newSize = Math.min(dx, dy);
+      newSize = Math.max(20, newSize);
+      newX = cropRect.x + cropRect.size - newSize;
+      newY = cropRect.y;
+    } else if (corner === 3) { // inferior-derecha
+      const dx = pos.x - cropRect.x;
+      const dy = pos.y - cropRect.y;
+      newSize = Math.min(dx, dy);
+      newSize = Math.max(20, newSize);
+      newX = cropRect.x;
+      newY = cropRect.y;
+    }
+    // Limitar dentro del canvas
+    if (newX < 0) newX = 0;
+    if (newY < 0) newY = 0;
+    if (newX + newSize > cropCanvasWidth) newSize = cropCanvasWidth - newX;
+    if (newY + newSize > cropCanvasHeight) newSize = cropCanvasHeight - newY;
+    cropRect.x = newX;
+    cropRect.y = newY;
+    cropRect.size = newSize;
+    // Actualizar slider
+    const slider = document.getElementById('cropSizeSlider');
+    if (slider) {
+      const percent = (newSize / Math.min(cropCanvasWidth, cropCanvasHeight)) * 100;
+      slider.value = Math.min(100, Math.max(20, percent));
+    }
+    drawCrop();
+    return;
+  }
+  if (isDragging) {
+    let newX = pos.x - dragStartX;
+    let newY = pos.y - dragStartY;
+    newX = Math.max(0, Math.min(cropCanvasWidth - cropRect.size, newX));
+    newY = Math.max(0, Math.min(cropCanvasHeight - cropRect.size, newY));
+    cropRect.x = newX;
+    cropRect.y = newY;
+    drawCrop();
+  }
+}
+
+function handleEnd(e) {
   isDragging = false;
+  isResizing = false;
   cropCanvas.style.cursor = 'default';
-});
-window.addEventListener('touchend', () => {
-  isDragging = false;
-});
+}
+
+// Event listeners
+cropCanvas.addEventListener('mousedown', handleStart);
+cropCanvas.addEventListener('touchstart', handleStart, { passive: false });
+window.addEventListener('mousemove', handleMove);
+window.addEventListener('touchmove', handleMove, { passive: false });
+window.addEventListener('mouseup', handleEnd);
+window.addEventListener('touchend', handleEnd);
+window.addEventListener('touchcancel', handleEnd);
+
+// Control deslizante para ajustar el tamaño del cuadrado (se crea dinámicamente)
+// Verificar si ya existe para no duplicar
+let sliderExists = document.getElementById('cropSizeSlider');
+if (!sliderExists) {
+  const sizeSlider = document.createElement('input');
+  sizeSlider.type = 'range';
+  sizeSlider.id = 'cropSizeSlider';
+  sizeSlider.min = 20;
+  sizeSlider.max = 100;
+  sizeSlider.value = 60; // porcentaje del canvas
+  sizeSlider.style.width = '100%';
+  sizeSlider.style.marginTop = '0.5rem';
+  sizeSlider.style.background = '#333';
+  sizeSlider.style.accentColor = '#bb86fc';
+  // Insertar el slider después del canvas
+  const cropControls = document.querySelector('#cropModal .modal-content');
+  const confirmBtn = document.getElementById('cropConfirmBtn');
+  cropControls.insertBefore(sizeSlider, confirmBtn);
+
+  sizeSlider.addEventListener('input', () => {
+    const percent = parseInt(sizeSlider.value) / 100;
+    const maxSize = Math.min(cropCanvasWidth, cropCanvasHeight);
+    const newSize = maxSize * percent;
+    // Mantener el centro
+    cropRect.x = (cropCanvasWidth - newSize) / 2;
+    cropRect.y = (cropCanvasHeight - newSize) / 2;
+    cropRect.size = newSize;
+    drawCrop();
+  });
+}
 
 cropConfirmBtn.addEventListener('click', async () => {
   const canvas = cropCanvas;
