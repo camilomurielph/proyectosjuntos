@@ -45,12 +45,6 @@ const ratingsDisplay = document.getElementById('ratingsDisplay');
 const starsContainer = document.getElementById('starsContainer');
 const ratingInfo = document.getElementById('ratingInfo');
 
-// Ubicación modal
-const locationModal = document.getElementById('locationModal');
-const locationSearchInput = document.getElementById('locationSearchInput');
-const locationSuggestions = document.getElementById('locationSuggestions');
-const cancelLocationBtn = document.getElementById('cancelLocationBtn');
-
 // Link modal (independiente)
 const linkModal = document.getElementById('linkModal');
 const closeLinkModalBtn = document.getElementById('closeLinkModalBtn');
@@ -58,6 +52,13 @@ const linkUrlInput = document.getElementById('linkUrlInput');
 const linkNameInput = document.getElementById('linkNameInput');
 const linkConfirmBtn = document.getElementById('linkConfirmBtn');
 const linkCancelBtn = document.getElementById('linkCancelBtn');
+
+// Ubicación modal (independiente)
+const locationModal = document.getElementById('locationModal');
+const closeLocationModalBtn = document.getElementById('closeLocationModalBtn');
+const locationSearchInput = document.getElementById('locationSearchInput');
+const locationSuggestions = document.getElementById('locationSuggestions');
+const locationCancelBtn = document.getElementById('locationCancelBtn');
 
 // Crop modal
 const cropModal = document.getElementById('cropModal');
@@ -162,9 +163,7 @@ async function saveRating(rating) {
       })
     });
     if (!res.ok) throw new Error('Error al guardar puntuación');
-    // Actualizar la lista de items para reflejar el cambio
     loadItems(currentType);
-    // Actualizar visualización local
     updateRatingsDisplay(data);
   } catch (error) {
     alert('Error al guardar puntuación');
@@ -226,13 +225,11 @@ logoutBtn.addEventListener('click', async () => {
 // ========== Carga de items ==========
 async function loadItems(type) {
   currentType = type;
-  // Mostrar u ocultar filtros
   filtersBar.style.display = (type === 'restaurante') ? 'flex' : 'none';
   try {
     const res = await fetch(`/api/items?type=${encodeURIComponent(type)}`);
     if (!res.ok) throw new Error('Error al cargar');
     items = await res.json();
-    // Para restaurantes, calcular distancia y añadir a cada item
     if (type === 'restaurante' && userPosition) {
       for (let item of items) {
         const subRes = await fetch(`/api/items/${item.id}/subitems`);
@@ -287,12 +284,10 @@ function renderItems(itemsData) {
     const isRestaurant = (item.type === 'restaurante');
     let metaHtml = '';
     if (isRestaurant) {
-      // Estrellas promedio
       const ratings = item.data?.ratings || {};
       const values = Object.values(ratings);
       const avg = values.length ? (values.reduce((s, v) => s + v, 0) / values.length) : 0;
       const stars = avg > 0 ? `⭐ ${avg.toFixed(1)}` : 'Sin puntuar';
-      // Distancia
       let distHtml = '';
       if (item.distance !== undefined && item.distance !== Infinity) {
         distHtml = `📍 ${item.distance.toFixed(1)} km`;
@@ -384,7 +379,6 @@ async function openBoard(item) {
   document.querySelector('.item-desc-area').style.display = 'flex';
   document.querySelector('.item-desc-edit').style.display = 'none';
 
-  // Mostrar/ocultar área de estrellas
   if (item.type === 'restaurante') {
     ratingArea.style.display = 'block';
     updateRatingsDisplay(item.data || {});
@@ -406,8 +400,8 @@ async function openBoard(item) {
     addLocationBtn.style.display = 'none';
   }
 
-  // Ocultar modales secundarios
-  locationModal.style.display = 'none';
+  // Cerrar modales secundarios
+  locationModal.classList.remove('active');
   linkModal.classList.remove('active');
   cropModal.classList.remove('active');
 
@@ -497,7 +491,7 @@ function renderSubitems(subitemsData) {
 closeModalBtn.addEventListener('click', () => {
   itemModal.classList.remove('active');
   currentItemId = null;
-  locationModal.style.display = 'none';
+  locationModal.classList.remove('active');
   linkModal.classList.remove('active');
   cropModal.classList.remove('active');
 });
@@ -505,7 +499,7 @@ itemModal.addEventListener('click', (e) => {
   if (e.target === itemModal) {
     itemModal.classList.remove('active');
     currentItemId = null;
-    locationModal.style.display = 'none';
+    locationModal.classList.remove('active');
     linkModal.classList.remove('active');
     cropModal.classList.remove('active');
   }
@@ -699,14 +693,12 @@ function openCropModal() {
     cropCanvasWidth = width;
     cropCanvasHeight = height;
     ctx.drawImage(img, 0, 0, width, height);
-    // Inicializar rectángulo de recorte: cuadrado del 60% del tamaño del canvas
     const size = Math.min(width, height) * 0.6;
     cropRect = {
       x: (width - size) / 2,
       y: (height - size) / 2,
       size: size
     };
-    // Actualizar slider
     const slider = document.getElementById('cropSizeSlider');
     if (slider) {
       const percent = (size / Math.min(width, height)) * 100;
@@ -724,17 +716,14 @@ function drawCrop() {
   img.onload = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    // Overlay oscuro fuera del cuadrado
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(0, 0, canvas.width, cropRect.y);
     ctx.fillRect(0, cropRect.y + cropRect.size, canvas.width, canvas.height - cropRect.y - cropRect.size);
     ctx.fillRect(0, cropRect.y, cropRect.x, cropRect.size);
     ctx.fillRect(cropRect.x + cropRect.size, cropRect.y, canvas.width - cropRect.x - cropRect.size, cropRect.size);
-    // Borde del cuadrado
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
     ctx.strokeRect(cropRect.x, cropRect.y, cropRect.size, cropRect.size);
-    // Dibujar manejadores de esquina (pequeños cuadrados)
     const handleSize = 8;
     const corners = [
       [cropRect.x, cropRect.y],
@@ -750,7 +739,6 @@ function drawCrop() {
   img.src = cropImageDataUrl;
 }
 
-// Eventos de ratón/touch para arrastrar y redimensionar
 function getMousePos(e) {
   const rect = cropCanvas.getBoundingClientRect();
   const scaleX = cropCanvas.width / rect.width;
@@ -770,7 +758,7 @@ function getMousePos(e) {
 }
 
 function isOnCorner(pos) {
-  const handleSize = 12; // tamaño de la zona de captura
+  const handleSize = 12;
   const corners = [
     [cropRect.x, cropRect.y],
     [cropRect.x + cropRect.size, cropRect.y],
@@ -781,7 +769,7 @@ function isOnCorner(pos) {
     const [cx, cy] = corners[i];
     if (pos.x >= cx - handleSize/2 && pos.x <= cx + handleSize/2 &&
         pos.y >= cy - handleSize/2 && pos.y <= cy + handleSize/2) {
-      return i; // 0: superior-izquierda, 1: superior-derecha, 2: inferior-izquierda, 3: inferior-derecha
+      return i;
     }
   }
   return -1;
@@ -801,7 +789,6 @@ function handleStart(e) {
     dragStartX = pos.x;
     dragStartY = pos.y;
     dragStartSize = cropRect.size;
-    // Guardar la esquina que se está arrastrando
     cropRect._corner = corner;
     return;
   }
@@ -816,34 +803,32 @@ function handleMove(e) {
   e.preventDefault();
   const pos = getMousePos(e);
   if (isResizing) {
-    // Redimensionar desde la esquina
     const corner = cropRect._corner;
     let newSize = cropRect.size;
     let newX = cropRect.x;
     let newY = cropRect.y;
-    // Calcular nuevo tamaño basado en la distancia desde la esquina opuesta
-    if (corner === 0) { // superior-izquierda
+    if (corner === 0) {
       const dx = cropRect.x + cropRect.size - pos.x;
       const dy = cropRect.y + cropRect.size - pos.y;
       newSize = Math.min(dx, dy);
       newSize = Math.max(20, newSize);
       newX = cropRect.x + cropRect.size - newSize;
       newY = cropRect.y + cropRect.size - newSize;
-    } else if (corner === 1) { // superior-derecha
+    } else if (corner === 1) {
       const dx = pos.x - cropRect.x;
       const dy = cropRect.y + cropRect.size - pos.y;
       newSize = Math.min(dx, dy);
       newSize = Math.max(20, newSize);
       newX = cropRect.x;
       newY = cropRect.y + cropRect.size - newSize;
-    } else if (corner === 2) { // inferior-izquierda
+    } else if (corner === 2) {
       const dx = cropRect.x + cropRect.size - pos.x;
       const dy = pos.y - cropRect.y;
       newSize = Math.min(dx, dy);
       newSize = Math.max(20, newSize);
       newX = cropRect.x + cropRect.size - newSize;
       newY = cropRect.y;
-    } else if (corner === 3) { // inferior-derecha
+    } else if (corner === 3) {
       const dx = pos.x - cropRect.x;
       const dy = pos.y - cropRect.y;
       newSize = Math.min(dx, dy);
@@ -851,7 +836,6 @@ function handleMove(e) {
       newX = cropRect.x;
       newY = cropRect.y;
     }
-    // Limitar dentro del canvas
     if (newX < 0) newX = 0;
     if (newY < 0) newY = 0;
     if (newX + newSize > cropCanvasWidth) newSize = cropCanvasWidth - newX;
@@ -859,7 +843,6 @@ function handleMove(e) {
     cropRect.x = newX;
     cropRect.y = newY;
     cropRect.size = newSize;
-    // Actualizar slider
     const slider = document.getElementById('cropSizeSlider');
     if (slider) {
       const percent = (newSize / Math.min(cropCanvasWidth, cropCanvasHeight)) * 100;
@@ -885,7 +868,6 @@ function handleEnd(e) {
   cropCanvas.style.cursor = 'default';
 }
 
-// Event listeners
 cropCanvas.addEventListener('mousedown', handleStart);
 cropCanvas.addEventListener('touchstart', handleStart, { passive: false });
 window.addEventListener('mousemove', handleMove);
@@ -894,8 +876,7 @@ window.addEventListener('mouseup', handleEnd);
 window.addEventListener('touchend', handleEnd);
 window.addEventListener('touchcancel', handleEnd);
 
-// Control deslizante para ajustar el tamaño del cuadrado (se crea dinámicamente)
-// Verificar si ya existe para no duplicar
+// Control deslizante para el tamaño del cuadrado
 let sliderExists = document.getElementById('cropSizeSlider');
 if (!sliderExists) {
   const sizeSlider = document.createElement('input');
@@ -903,12 +884,11 @@ if (!sliderExists) {
   sizeSlider.id = 'cropSizeSlider';
   sizeSlider.min = 20;
   sizeSlider.max = 100;
-  sizeSlider.value = 60; // porcentaje del canvas
+  sizeSlider.value = 60;
   sizeSlider.style.width = '100%';
   sizeSlider.style.marginTop = '0.5rem';
   sizeSlider.style.background = '#333';
   sizeSlider.style.accentColor = '#bb86fc';
-  // Insertar el slider después del canvas
   const cropControls = document.querySelector('#cropModal .modal-content');
   const confirmBtn = document.getElementById('cropConfirmBtn');
   cropControls.insertBefore(sizeSlider, confirmBtn);
@@ -917,7 +897,6 @@ if (!sliderExists) {
     const percent = parseInt(sizeSlider.value) / 100;
     const maxSize = Math.min(cropCanvasWidth, cropCanvasHeight);
     const newSize = maxSize * percent;
-    // Mantener el centro
     cropRect.x = (cropCanvasWidth - newSize) / 2;
     cropRect.y = (cropCanvasHeight - newSize) / 2;
     cropRect.size = newSize;
@@ -966,18 +945,31 @@ closeCropBtn.addEventListener('click', () => {
   cropModal.classList.remove('active');
 });
 
-// ===== Ubicación con autocompletado =====
+// ===== Ubicación con autocompletado (modal independiente) =====
 let locationSearchTimeout = null;
 
-addLocationBtn.addEventListener('click', () => {
-  locationModal.style.display = 'block';
-  locationSearchInput.value = '';
-  locationSuggestions.innerHTML = '';
-  locationSearchInput.focus();
-});
+// Asegurar que el botón existe y tiene un listener
+if (addLocationBtn) {
+  addLocationBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    locationModal.classList.add('active');
+    locationSearchInput.value = '';
+    locationSuggestions.innerHTML = '';
+    setTimeout(() => locationSearchInput.focus(), 100);
+  });
+} else {
+  console.warn('Botón de ubicación no encontrado en el DOM');
+}
 
-cancelLocationBtn.addEventListener('click', () => {
-  locationModal.style.display = 'none';
+function closeLocationModal() {
+  locationModal.classList.remove('active');
+}
+
+closeLocationModalBtn.addEventListener('click', closeLocationModal);
+locationCancelBtn.addEventListener('click', closeLocationModal);
+locationModal.addEventListener('click', (e) => {
+  if (e.target === locationModal) closeLocationModal();
 });
 
 locationSearchInput.addEventListener('input', async () => {
@@ -1018,7 +1010,7 @@ async function addLocation(address, lat, lng, displayName) {
       body: JSON.stringify({ type: 'location', content: address, metadata })
     });
     if (!res.ok) throw new Error('Error al guardar ubicación');
-    locationModal.style.display = 'none';
+    closeLocationModal();
     await loadSubitems(currentItemId);
     loadItems(currentType);
   } catch (error) {
