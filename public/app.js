@@ -45,7 +45,7 @@ const ratingsDisplay = document.getElementById('ratingsDisplay');
 const starsContainer = document.getElementById('starsContainer');
 const ratingInfo = document.getElementById('ratingInfo');
 
-// Link modal (independiente)
+// Link modal
 const linkModal = document.getElementById('linkModal');
 const closeLinkModalBtn = document.getElementById('closeLinkModalBtn');
 const linkUrlInput = document.getElementById('linkUrlInput');
@@ -53,11 +53,11 @@ const linkNameInput = document.getElementById('linkNameInput');
 const linkConfirmBtn = document.getElementById('linkConfirmBtn');
 const linkCancelBtn = document.getElementById('linkCancelBtn');
 
-// Ubicación modal (independiente)
+// Location modal (nuevo estilo)
 const locationModal = document.getElementById('locationModal');
 const closeLocationModalBtn = document.getElementById('closeLocationModalBtn');
-const locationSearchInput = document.getElementById('locationSearchInput');
-const locationSuggestions = document.getElementById('locationSuggestions');
+const locationInput = document.getElementById('locationInput');
+const locationConfirmBtn = document.getElementById('locationConfirmBtn');
 const locationCancelBtn = document.getElementById('locationCancelBtn');
 
 // Crop modal
@@ -392,14 +392,12 @@ async function openBoard(item) {
     ratingArea.style.display = 'none';
   }
 
-  // Mostrar/ocultar botón de ubicación
   if (item.type === 'restaurante' || item.type === 'cita') {
     addLocationBtn.style.display = 'inline-block';
   } else {
     addLocationBtn.style.display = 'none';
   }
 
-  // Cerrar modales secundarios
   locationModal.classList.remove('active');
   linkModal.classList.remove('active');
   cropModal.classList.remove('active');
@@ -437,27 +435,12 @@ function renderSubitems(subitemsData) {
     } else if (sub.type === 'image') {
       contentHtml = `<img src="${escapeHtml(sub.content)}" alt="Imagen" loading="lazy">`;
     } else if (sub.type === 'location') {
-      const meta = sub.metadata || {};
-      const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${meta.lng-0.01},${meta.lat-0.01},${meta.lng+0.01},${meta.lat+0.01}&layer=mapnik&marker=${meta.lat},${meta.lng}`;
-      let distanceHtml = '';
-      if (userPosition && meta.lat && meta.lng) {
-        const dist = getDistanceFromLatLonInKm(userPosition.lat, userPosition.lng, meta.lat, meta.lng);
-        distanceHtml = `<div class="distance">📍 ${dist.toFixed(1)} km</div>`;
-      } else {
-        if (!userPosition) {
-          getUserPosition().then(() => {
-            if (currentItemId) loadSubitems(currentItemId);
-          });
-        }
-      }
+      const address = sub.content;
+      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
       contentHtml = `
         <div class="location-card">
-          <div class="map-container">
-            <iframe src="${mapUrl}" width="100%" height="100%" style="border:0;" allowfullscreen loading="lazy"></iframe>
-          </div>
-          <div class="location-address">${escapeHtml(sub.content)}</div>
-          ${meta.display_name ? `<div class="location-name">${escapeHtml(meta.display_name)}</div>` : ''}
-          ${distanceHtml}
+          <div class="location-address">${escapeHtml(address)}</div>
+          <a href="${mapUrl}" target="_blank" style="display:inline-block; margin-top:0.3rem; padding:0.3rem 0.8rem; background:#bb86fc; color:#121212; text-decoration:none; font-weight:bold; border-radius:0px;">📍 Abrir en mapa</a>
         </div>
       `;
     }
@@ -601,7 +584,7 @@ addNoteBtn.addEventListener('click', async () => {
   }
 });
 
-// Enlace (modal independiente)
+// Enlace
 addLinkBtn.addEventListener('click', () => {
   linkModal.classList.add('active');
   linkUrlInput.value = '';
@@ -639,7 +622,7 @@ linkConfirmBtn.addEventListener('click', async () => {
   }
 });
 
-// ===== Recorte de imagen con redimensionamiento =====
+// ===== Recorte de imagen =====
 let cropImageFile = null;
 let cropImageDataUrl = null;
 let cropRect = { x: 0, y: 0, size: 200 };
@@ -875,9 +858,8 @@ window.addEventListener('mouseup', handleEnd);
 window.addEventListener('touchend', handleEnd);
 window.addEventListener('touchcancel', handleEnd);
 
-// Control deslizante para el tamaño del cuadrado - corregido
+// Slider de crop
 function initCropSlider() {
-  // Eliminar slider existente si ya hay uno para evitar duplicados
   const oldSlider = document.getElementById('cropSizeSlider');
   if (oldSlider) oldSlider.remove();
 
@@ -892,13 +874,11 @@ function initCropSlider() {
   sizeSlider.style.background = '#333';
   sizeSlider.style.accentColor = '#bb86fc';
 
-  // Buscar el contenedor de los botones dentro del modal de crop
   const modalContent = document.querySelector('#cropModal .modal-content');
-  const buttonsDiv = modalContent.querySelector('div:last-child'); // el div que contiene los botones de recortar/cancelar
+  const buttonsDiv = modalContent.querySelector('div:last-child');
   if (buttonsDiv) {
     modalContent.insertBefore(sizeSlider, buttonsDiv);
   } else {
-    // Fallback: agregar al final
     modalContent.appendChild(sizeSlider);
   }
 
@@ -913,15 +893,12 @@ function initCropSlider() {
   });
 }
 
-// Inicializar slider cuando el modal de crop esté listo
-// Se llamará cada vez que se abra el modal de crop, pero solo creará si no existe
 function ensureCropSlider() {
   if (!document.getElementById('cropSizeSlider')) {
     initCropSlider();
   }
 }
 
-// Llamar a ensureCropSlider al abrir el crop modal
 const originalOpenCrop = openCropModal;
 openCropModal = function() {
   originalOpenCrop();
@@ -969,10 +946,7 @@ closeCropBtn.addEventListener('click', () => {
   cropModal.classList.remove('active');
 });
 
-// ===== Ubicación con autocompletado (modal independiente) =====
-let locationSearchTimeout = null;
-
-// Asignar evento al botón de ubicación de manera robusta
+// ===== Ubicación (texto libre + botón de mapa) =====
 function setupLocationButton() {
   if (addLocationBtn) {
     addLocationBtn.removeEventListener('click', locationClickHandler);
@@ -984,9 +958,8 @@ function locationClickHandler(e) {
   e.preventDefault();
   e.stopPropagation();
   locationModal.classList.add('active');
-  locationSearchInput.value = '';
-  locationSuggestions.innerHTML = '';
-  setTimeout(() => locationSearchInput.focus(), 100);
+  locationInput.value = '';
+  setTimeout(() => locationInput.focus(), 100);
 }
 
 function closeLocationModal() {
@@ -999,42 +972,19 @@ locationModal.addEventListener('click', (e) => {
   if (e.target === locationModal) closeLocationModal();
 });
 
-locationSearchInput.addEventListener('input', async () => {
-  const query = locationSearchInput.value.trim();
-  if (query.length < 2) {
-    locationSuggestions.innerHTML = '';
-    return;
-  }
-  clearTimeout(locationSearchTimeout);
-  locationSearchTimeout = setTimeout(async () => {
-    try {
-      const res = await fetch(`/api/search-places?query=${encodeURIComponent(query)}`);
-      if (!res.ok) throw new Error('Error en búsqueda');
-      const data = await res.json();
-      locationSuggestions.innerHTML = data.map(item => `
-        <div class="suggestion-item" style="padding:0.5rem; background:#333; margin-bottom:0.2rem; cursor:pointer; border-radius:0px;">
-          ${escapeHtml(item.label)}
-        </div>
-      `).join('');
-      document.querySelectorAll('.suggestion-item').forEach((el, index) => {
-        el.addEventListener('click', () => {
-          const selected = data[index];
-          addLocation(selected.label, selected.lat, selected.lng, selected.display_name);
-        });
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  }, 300);
-});
-
-async function addLocation(address, lat, lng, displayName) {
+locationConfirmBtn.addEventListener('click', async () => {
+  const address = locationInput.value.trim();
+  if (!address) return alert('Por favor ingresa una dirección');
   try {
-    const metadata = { lat, lng, display_name: displayName || address };
+    const metadata = { address: address };
     const res = await fetch(`/api/items/${currentItemId}/subitems`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'location', content: address, metadata })
+      body: JSON.stringify({
+        type: 'location',
+        content: address,
+        metadata: metadata
+      })
     });
     if (!res.ok) throw new Error('Error al guardar ubicación');
     closeLocationModal();
@@ -1043,14 +993,14 @@ async function addLocation(address, lat, lng, displayName) {
   } catch (error) {
     alert('Error al añadir ubicación: ' + error.message);
   }
-}
+});
 
-// Llamar a setupLocationButton al cargar y cada vez que se abra un tablero (por si el botón se regenera)
+// Configurar el botón de ubicación al inicio
 setupLocationButton();
-// También configurar después de cada apertura de tablero para estar seguros
-const originalOpenBoard = openBoard;
+// Y también cada vez que se abre un tablero
+const originalOpenBoard2 = openBoard;
 openBoard = async function(item) {
-  await originalOpenBoard(item);
+  await originalOpenBoard2(item);
   setTimeout(setupLocationButton, 50);
 };
 
