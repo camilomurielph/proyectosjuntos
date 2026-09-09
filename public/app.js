@@ -53,7 +53,7 @@ const linkNameInput = document.getElementById('linkNameInput');
 const linkConfirmBtn = document.getElementById('linkConfirmBtn');
 const linkCancelBtn = document.getElementById('linkCancelBtn');
 
-// Location modal (nuevo estilo)
+// Location modal
 const locationModal = document.getElementById('locationModal');
 const closeLocationModalBtn = document.getElementById('closeLocationModalBtn');
 const locationInput = document.getElementById('locationInput');
@@ -436,11 +436,18 @@ function renderSubitems(subitemsData) {
       contentHtml = `<img src="${escapeHtml(sub.content)}" alt="Imagen" loading="lazy">`;
     } else if (sub.type === 'location') {
       const address = sub.content;
-      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+      // Enlaces que intentan abrir la app directamente
+      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+      const wazeUrl = `waze://?q=${encodeURIComponent(address)}&navigate=yes`; // intenta abrir app
+      // fallback web para waze si no tiene app
+      const wazeWebUrl = `https://www.waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`;
       contentHtml = `
         <div class="location-card">
           <div class="location-address">${escapeHtml(address)}</div>
-          <a href="${mapUrl}" target="_blank" style="display:inline-block; margin-top:0.3rem; padding:0.3rem 0.8rem; background:#bb86fc; color:#121212; text-decoration:none; font-weight:bold; border-radius:0px;">📍 Abrir en mapa</a>
+          <div style="display:flex; gap:0.3rem; margin-top:0.3rem; justify-content:center; flex-wrap:wrap;">
+            <a href="${googleMapsUrl}" target="_blank" class="map-btn google-btn">Google Maps</a>
+            <a href="${wazeUrl}" target="_blank" class="map-btn waze-btn" onclick="if(!navigator.userAgent.match(/(Android|iPhone|iPad|iPod)/i)){this.href='${wazeWebUrl}'}">Waze</a>
+          </div>
         </div>
       `;
     }
