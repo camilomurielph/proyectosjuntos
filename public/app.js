@@ -61,12 +61,10 @@ const locationConfirmBtn = document.getElementById('locationConfirmBtn');
 const locationCancelBtn = document.getElementById('locationCancelBtn');
 const suggestionsList = document.getElementById('suggestionsList');
 
-// Crop modal
-const cropModal = document.getElementById('cropModal');
-const cropCanvas = document.getElementById('cropCanvas');
-const closeCropBtn = document.getElementById('closeCropBtn');
-const cropConfirmBtn = document.getElementById('cropConfirmBtn');
-const cropCancelBtn = document.getElementById('cropCancelBtn');
+// Image viewer modal
+const imageViewerModal = document.getElementById('imageViewerModal');
+const imageViewerImg = document.getElementById('imageViewerImg');
+const closeImageViewerBtn = document.getElementById('closeImageViewerBtn');
 
 // Filtros
 const filterRating = document.getElementById('filterRating');
@@ -403,7 +401,7 @@ async function openBoard(item) {
 
   locationModal.classList.remove('active');
   linkModal.classList.remove('active');
-  cropModal.classList.remove('active');
+  imageViewerModal.classList.remove('active');
 
   await loadSubitems(item.id);
   itemModal.classList.add('active');
@@ -436,7 +434,7 @@ function renderSubitems(subitemsData) {
       const url = meta.url || sub.content;
       contentHtml = `<a href="${escapeHtml(url)}" target="_blank">${escapeHtml(name)}</a>`;
     } else if (sub.type === 'image') {
-      contentHtml = `<img src="${escapeHtml(sub.content)}" alt="Imagen" loading="lazy">`;
+      contentHtml = `<img src="${escapeHtml(sub.content)}" alt="Imagen" loading="lazy" class="subitem-image" data-src="${escapeHtml(sub.content)}">`;
     } else if (sub.type === 'location') {
       const address = sub.content;
       const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
@@ -460,6 +458,8 @@ function renderSubitems(subitemsData) {
     `;
   });
   subitemsList.innerHTML = html;
+
+  // Eventos para eliminar subitems
   document.querySelectorAll('.sub-delete').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -475,7 +475,31 @@ function renderSubitems(subitemsData) {
       }
     });
   });
+
+  // Eventos para ver imágenes a tamaño completo
+  document.querySelectorAll('.subitem-image').forEach(img => {
+    img.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openImageViewer(img.dataset.src);
+    });
+  });
 }
+
+// ========== Visor de imagen ==========
+function openImageViewer(src) {
+  imageViewerImg.src = src;
+  imageViewerModal.classList.add('active');
+}
+
+function closeImageViewer() {
+  imageViewerModal.classList.remove('active');
+  imageViewerImg.src = '';
+}
+
+closeImageViewerBtn.addEventListener('click', closeImageViewer);
+imageViewerModal.addEventListener('click', (e) => {
+  if (e.target === imageViewerModal) closeImageViewer();
+});
 
 // Cerrar modal principal
 closeModalBtn.addEventListener('click', () => {
@@ -483,7 +507,7 @@ closeModalBtn.addEventListener('click', () => {
   currentItemId = null;
   locationModal.classList.remove('active');
   linkModal.classList.remove('active');
-  cropModal.classList.remove('active');
+  imageViewerModal.classList.remove('active');
 });
 itemModal.addEventListener('click', (e) => {
   if (e.target === itemModal) {
@@ -491,7 +515,7 @@ itemModal.addEventListener('click', (e) => {
     currentItemId = null;
     locationModal.classList.remove('active');
     linkModal.classList.remove('active');
-    cropModal.classList.remove('active');
+    imageViewerModal.classList.remove('active');
   }
 });
 
@@ -630,328 +654,38 @@ linkConfirmBtn.addEventListener('click', async () => {
   }
 });
 
-// ===== Recorte de imagen =====
-let cropImageFile = null;
-let cropImageDataUrl = null;
-let cropRect = { x: 0, y: 0, size: 200 };
-let isDragging = false;
-let isResizing = false;
-let dragStartX, dragStartY, dragStartSize;
-let cropCanvasWidth = 0, cropCanvasHeight = 0;
-
+// ===== Subida de imagen (sin recorte, directa) =====
 addImageBtn.addEventListener('click', () => {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
-  input.onchange = (e) => {
+  input.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      cropImageDataUrl = ev.target.result;
-      cropImageFile = file;
-      openCropModal();
-    };
-    reader.readAsDataURL(file);
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Error al subir imagen');
+      }
+      const data = await res.json();
+      const subRes = await fetch(`/api/items/${currentItemId}/subitems`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'image', content: data.url, metadata: {} })
+      });
+      if (!subRes.ok) throw new Error('Error al guardar imagen');
+      await loadSubitems(currentItemId);
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
   };
   input.click();
-});
-
-function openCropModal() {
-  cropModal.classList.add('active');
-  const img = new Image();
-  img.onload = () => {
-    const canvas = cropCanvas;
-    const ctx = canvas.getContext('2d');
-    const modalContent = cropModal.querySelector('.modal-content');
-    const maxWidth = modalContent.clientWidth - 40;
-    const maxHeight = window.innerHeight * 0.6;
-    let width = img.width;
-    let height = img.height;
-    if (width > maxWidth) {
-      const ratio = maxWidth / width;
-      width = maxWidth;
-      height = height * ratio;
-    }
-    if (height > maxHeight) {
-      const ratio = maxHeight / height;
-      height = maxHeight;
-      width = width * ratio;
-    }
-    canvas.width = width;
-    canvas.height = height;
-    cropCanvasWidth = width;
-    cropCanvasHeight = height;
-    ctx.drawImage(img, 0, 0, width, height);
-    const size = Math.min(width, height) * 0.6;
-    cropRect = {
-      x: (width - size) / 2,
-      y: (height - size) / 2,
-      size: size
-    };
-    const slider = document.getElementById('cropSizeSlider');
-    if (slider) {
-      const percent = (size / Math.min(width, height)) * 100;
-      slider.value = Math.min(100, Math.max(20, percent));
-    }
-    drawCrop();
-  };
-  img.src = cropImageDataUrl;
-}
-
-function drawCrop() {
-  const canvas = cropCanvas;
-  const ctx = canvas.getContext('2d');
-  const img = new Image();
-  img.onload = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(0, 0, canvas.width, cropRect.y);
-    ctx.fillRect(0, cropRect.y + cropRect.size, canvas.width, canvas.height - cropRect.y - cropRect.size);
-    ctx.fillRect(0, cropRect.y, cropRect.x, cropRect.size);
-    ctx.fillRect(cropRect.x + cropRect.size, cropRect.y, canvas.width - cropRect.x - cropRect.size, cropRect.size);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(cropRect.x, cropRect.y, cropRect.size, cropRect.size);
-    const handleSize = 8;
-    const corners = [
-      [cropRect.x, cropRect.y],
-      [cropRect.x + cropRect.size - handleSize, cropRect.y],
-      [cropRect.x, cropRect.y + cropRect.size - handleSize],
-      [cropRect.x + cropRect.size - handleSize, cropRect.y + cropRect.size - handleSize]
-    ];
-    ctx.fillStyle = '#fff';
-    corners.forEach(([cx, cy]) => {
-      ctx.fillRect(cx, cy, handleSize, handleSize);
-    });
-  };
-  img.src = cropImageDataUrl;
-}
-
-function getMousePos(e) {
-  const rect = cropCanvas.getBoundingClientRect();
-  const scaleX = cropCanvas.width / rect.width;
-  const scaleY = cropCanvas.height / rect.height;
-  let clientX, clientY;
-  if (e.touches) {
-    clientX = e.touches[0].clientX;
-    clientY = e.touches[0].clientY;
-  } else {
-    clientX = e.clientX;
-    clientY = e.clientY;
-  }
-  return {
-    x: (clientX - rect.left) * scaleX,
-    y: (clientY - rect.top) * scaleY
-  };
-}
-
-function isOnCorner(pos) {
-  const handleSize = 12;
-  const corners = [
-    [cropRect.x, cropRect.y],
-    [cropRect.x + cropRect.size, cropRect.y],
-    [cropRect.x, cropRect.y + cropRect.size],
-    [cropRect.x + cropRect.size, cropRect.y + cropRect.size]
-  ];
-  for (let i = 0; i < corners.length; i++) {
-    const [cx, cy] = corners[i];
-    if (pos.x >= cx - handleSize/2 && pos.x <= cx + handleSize/2 &&
-        pos.y >= cy - handleSize/2 && pos.y <= cy + handleSize/2) {
-      return i;
-    }
-  }
-  return -1;
-}
-
-function isInsideRect(pos) {
-  return pos.x >= cropRect.x && pos.x <= cropRect.x + cropRect.size &&
-         pos.y >= cropRect.y && pos.y <= cropRect.y + cropRect.size;
-}
-
-function handleStart(e) {
-  e.preventDefault();
-  const pos = getMousePos(e);
-  const corner = isOnCorner(pos);
-  if (corner !== -1) {
-    isResizing = true;
-    dragStartX = pos.x;
-    dragStartY = pos.y;
-    dragStartSize = cropRect.size;
-    cropRect._corner = corner;
-    return;
-  }
-  if (isInsideRect(pos)) {
-    isDragging = true;
-    dragStartX = pos.x - cropRect.x;
-    dragStartY = pos.y - cropRect.y;
-  }
-}
-
-function handleMove(e) {
-  e.preventDefault();
-  const pos = getMousePos(e);
-  if (isResizing) {
-    const corner = cropRect._corner;
-    let newSize = cropRect.size;
-    let newX = cropRect.x;
-    let newY = cropRect.y;
-    if (corner === 0) {
-      const dx = cropRect.x + cropRect.size - pos.x;
-      const dy = cropRect.y + cropRect.size - pos.y;
-      newSize = Math.min(dx, dy);
-      newSize = Math.max(20, newSize);
-      newX = cropRect.x + cropRect.size - newSize;
-      newY = cropRect.y + cropRect.size - newSize;
-    } else if (corner === 1) {
-      const dx = pos.x - cropRect.x;
-      const dy = cropRect.y + cropRect.size - pos.y;
-      newSize = Math.min(dx, dy);
-      newSize = Math.max(20, newSize);
-      newX = cropRect.x;
-      newY = cropRect.y + cropRect.size - newSize;
-    } else if (corner === 2) {
-      const dx = cropRect.x + cropRect.size - pos.x;
-      const dy = pos.y - cropRect.y;
-      newSize = Math.min(dx, dy);
-      newSize = Math.max(20, newSize);
-      newX = cropRect.x + cropRect.size - newSize;
-      newY = cropRect.y;
-    } else if (corner === 3) {
-      const dx = pos.x - cropRect.x;
-      const dy = pos.y - cropRect.y;
-      newSize = Math.min(dx, dy);
-      newSize = Math.max(20, newSize);
-      newX = cropRect.x;
-      newY = cropRect.y;
-    }
-    if (newX < 0) newX = 0;
-    if (newY < 0) newY = 0;
-    if (newX + newSize > cropCanvasWidth) newSize = cropCanvasWidth - newX;
-    if (newY + newSize > cropCanvasHeight) newSize = cropCanvasHeight - newY;
-    cropRect.x = newX;
-    cropRect.y = newY;
-    cropRect.size = newSize;
-    const slider = document.getElementById('cropSizeSlider');
-    if (slider) {
-      const percent = (newSize / Math.min(cropCanvasWidth, cropCanvasHeight)) * 100;
-      slider.value = Math.min(100, Math.max(20, percent));
-    }
-    drawCrop();
-    return;
-  }
-  if (isDragging) {
-    let newX = pos.x - dragStartX;
-    let newY = pos.y - dragStartY;
-    newX = Math.max(0, Math.min(cropCanvasWidth - cropRect.size, newX));
-    newY = Math.max(0, Math.min(cropCanvasHeight - cropRect.size, newY));
-    cropRect.x = newX;
-    cropRect.y = newY;
-    drawCrop();
-  }
-}
-
-function handleEnd(e) {
-  isDragging = false;
-  isResizing = false;
-  cropCanvas.style.cursor = 'default';
-}
-
-cropCanvas.addEventListener('mousedown', handleStart);
-cropCanvas.addEventListener('touchstart', handleStart, { passive: false });
-window.addEventListener('mousemove', handleMove);
-window.addEventListener('touchmove', handleMove, { passive: false });
-window.addEventListener('mouseup', handleEnd);
-window.addEventListener('touchend', handleEnd);
-window.addEventListener('touchcancel', handleEnd);
-
-// Slider de crop
-function initCropSlider() {
-  const oldSlider = document.getElementById('cropSizeSlider');
-  if (oldSlider) oldSlider.remove();
-
-  const sizeSlider = document.createElement('input');
-  sizeSlider.type = 'range';
-  sizeSlider.id = 'cropSizeSlider';
-  sizeSlider.min = 20;
-  sizeSlider.max = 100;
-  sizeSlider.value = 60;
-  sizeSlider.style.width = '100%';
-  sizeSlider.style.marginTop = '0.5rem';
-  sizeSlider.style.background = '#333';
-  sizeSlider.style.accentColor = '#bb86fc';
-
-  const modalContent = document.querySelector('#cropModal .modal-content');
-  const buttonsDiv = modalContent.querySelector('div:last-child');
-  if (buttonsDiv) {
-    modalContent.insertBefore(sizeSlider, buttonsDiv);
-  } else {
-    modalContent.appendChild(sizeSlider);
-  }
-
-  sizeSlider.addEventListener('input', () => {
-    const percent = parseInt(sizeSlider.value) / 100;
-    const maxSize = Math.min(cropCanvasWidth, cropCanvasHeight);
-    const newSize = maxSize * percent;
-    cropRect.x = (cropCanvasWidth - newSize) / 2;
-    cropRect.y = (cropCanvasHeight - newSize) / 2;
-    cropRect.size = newSize;
-    drawCrop();
-  });
-}
-
-function ensureCropSlider() {
-  if (!document.getElementById('cropSizeSlider')) {
-    initCropSlider();
-  }
-}
-
-const originalOpenCrop = openCropModal;
-openCropModal = function() {
-  originalOpenCrop();
-  setTimeout(ensureCropSlider, 100);
-};
-
-cropConfirmBtn.addEventListener('click', async () => {
-  const canvas = cropCanvas;
-  const ctx = canvas.getContext('2d');
-  const imageData = ctx.getImageData(cropRect.x, cropRect.y, cropRect.size, cropRect.size);
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = cropRect.size;
-  tempCanvas.height = cropRect.size;
-  const tempCtx = tempCanvas.getContext('2d');
-  tempCtx.putImageData(imageData, 0, 0);
-  const croppedDataUrl = tempCanvas.toDataURL('image/webp', 0.9);
-  try {
-    const res = await fetch('/api/upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: croppedDataUrl })
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Error al subir imagen');
-    }
-    const data = await res.json();
-    const subRes = await fetch(`/api/items/${currentItemId}/subitems`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'image', content: data.url, metadata: {} })
-    });
-    if (!subRes.ok) throw new Error('Error al guardar imagen');
-    cropModal.classList.remove('active');
-    await loadSubitems(currentItemId);
-  } catch (error) {
-    alert('Error: ' + error.message);
-  }
-});
-
-cropCancelBtn.addEventListener('click', () => {
-  cropModal.classList.remove('active');
-});
-closeCropBtn.addEventListener('click', () => {
-  cropModal.classList.remove('active');
 });
 
 // ===== Ubicación con autocompletado (ArcGIS) =====
@@ -1044,7 +778,6 @@ locationConfirmBtn.addEventListener('click', async () => {
   
   try {
     let lat, lng, displayName = address;
-    // Si hay sugerencia seleccionada y coincide con el texto, usar su magicKey
     if (selectedSuggestion && selectedSuggestion.text === address) {
       const magicKey = selectedSuggestion.magicKey;
       const geoRes = await fetch(`/api/geocode?address=${encodeURIComponent(address)}&magicKey=${encodeURIComponent(magicKey)}`);
@@ -1053,11 +786,8 @@ locationConfirmBtn.addEventListener('click', async () => {
         lat = geoData.lat;
         lng = geoData.lng;
         displayName = geoData.display_name || address;
-      } else {
-        console.warn('Geocodificación con magicKey fallida, intentando sin ella');
       }
     }
-    // Si no se obtuvo con magicKey o no había sugerencia, intentar geocodificación normal
     if (!lat) {
       const geoRes = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
       if (geoRes.ok) {
@@ -1097,9 +827,7 @@ locationConfirmBtn.addEventListener('click', async () => {
   }
 });
 
-// Configurar el botón de ubicación al inicio
 setupLocationButton();
-// Y también cada vez que se abre un tablero
 const originalOpenBoard2 = openBoard;
 openBoard = async function(item) {
   await originalOpenBoard2(item);
