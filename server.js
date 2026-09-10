@@ -169,6 +169,7 @@ app.put('/api/items/:id', isAuthenticated, (req, res) => {
 
 app.delete('/api/items/:id', isAuthenticated, (req, res) => {
   const { id } = req.params;
+  // Eliminar archivos de imágenes asociadas a subitems
   const subitems = db.prepare('SELECT * FROM subitems WHERE item_id = ?').all(id);
   subitems.forEach(sub => {
     if (sub.type === 'image' && sub.content) {
@@ -224,6 +225,7 @@ app.delete('/api/subitems/:id', isAuthenticated, (req, res) => {
   const { id } = req.params;
   const sub = db.prepare('SELECT * FROM subitems WHERE id = ?').get(id);
   if (!sub) return res.status(404).json({ error: 'Subitem no encontrado' });
+  // Si es una imagen, eliminar el archivo físico del servidor
   if (sub.type === 'image' && sub.content) {
     const filePath = path.join(__dirname, sub.content);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -263,7 +265,7 @@ app.get('/api/suggest', isAuthenticated, async (req, res) => {
       params: {
         text: query,
         maxSuggestions: 5,
-        countryCode: 'COL', // priorizar Colombia
+        countryCode: 'COL',
         f: 'json'
       }
     });
@@ -307,23 +309,34 @@ app.get('/api/geocode', isAuthenticated, async (req, res) => {
 });
 
 // ===== UPLOAD DE IMÁGENES =====
-app.post('/api/upload', isAuthenticated, async (req, res) => {
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB máximo
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten imágenes'), false);
+    }
+  }
+});
+
+app.post('/api/upload', isAuthenticated, upload.single('image'), async (req, res) => {
   try {
-    const { image } = req.body;
-    if (!image) return res.status(400).json({ error: 'No se recibió imagen' });
-    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
+    if (!req.file) return res.status(400).json({ error: 'No se subió ninguna imagen' });
     const timestamp = Date.now();
     const filename = `${timestamp}-${Math.random().toString(36).substring(7)}.webp`;
     const outputPath = path.join(uploadsDir, filename);
-    await sharp(buffer)
-      .resize(800, 800, { fit: 'cover' })
-      .webp({ quality: 80 })
+    // Auto-rotar según EXIF, redimensionar si supera 1200px y convertir a WebP
+    await sharp(req.file.buffer)
+      .rotate()
+      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 75 })
       .toFile(outputPath);
-    const publicUrl = `/uploads/${filename}`;
-    res.json({ url: publicUrl });
+    res.json({ url: `/uploads/${filename}` });
   } catch (err) {
-    console.error(err);
+    console.error('Error al procesar la imagen:', err);
     res.status(500).json({ error: 'Error al procesar la imagen' });
   }
 });
