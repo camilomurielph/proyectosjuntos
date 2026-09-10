@@ -786,3 +786,47 @@ button,
 #locationInput {
   font-size: 1rem;
 }
+
+/* Imagen en tarjeta de subitem: cuadrada, recortada */
+.subitem-card .sub-content img.subitem-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.subitem-card .sub-content img.subitem-image:active {
+  opacity: 0.8;
+}
+
+/* Visor de imagen a tamaño completo */
+#imageViewerModal {
+  background: rgba(0,0,0,0.95);
+}
+#imageViewerModal img {
+  max-width: 95vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+}
+#closeImageViewerBtn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  font-size: 1.8rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50% !important;
+  z-index: 101;
+  cursor: pointer;
+}
+#closeImageViewerBtn:hover {
+  background: rgba(255,255,255,0.2);
+}
