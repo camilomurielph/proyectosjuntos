@@ -3,7 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-  <title>Compartidos App</title>
+  <title>Compartidos</title>
+
+  <!-- Iconos y manifest -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Comportamiento como app nativa en iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Compartidos">
+  <meta name="theme-color" content="#1a0d2e">
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -143,7 +157,7 @@
     </div>
   </div>
 
-  <!-- MODAL PARA UBICACIÓN (CON AUTOCOMPLETADO ARCGIS) - CON ALTURA AJUSTADA -->
+  <!-- MODAL PARA UBICACIÓN (CON AUTOCOMPLETADO ARCGIS) -->
   <div id="locationModal" class="modal" style="align-items: center; background: rgba(0,0,0,0.8);">
     <div class="modal-content" style="max-height: 90vh; border-radius: 6px; background: #1e1e1e; width: 95%; max-width: 400px; padding: 1.2rem 1.2rem 1.5rem;">
       <header class="modal-header">
