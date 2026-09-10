@@ -5,14 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
   <title>Compartidos</title>
 
-  <!-- Iconos y manifest -->
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon.png">
   <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/apple-touch-icon.png">
   <link rel="manifest" href="/manifest.json">
 
-  <!-- Comportamiento como app nativa en iOS -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Compartidos">
@@ -43,7 +41,6 @@
       <button id="logoutBtn" class="logout-btn">Cerrar sesión</button>
     </header>
 
-    <!-- FILTROS -->
     <div id="filtersBar" style="display:none; padding: 0.5rem 1rem; background: #1e1e1e; border-bottom: 1px solid #333; gap: 0.5rem; flex-wrap: wrap;">
       <button id="filterRating" class="filter-btn active" data-sort="rating">⭐ Mejor puntuación</button>
       <button id="filterDistance" class="filter-btn" data-sort="distance">📍 Más cercano</button>
@@ -71,7 +68,6 @@
         <button id="closeModalBtn" class="close-btn">&times;</button>
       </header>
 
-      <!-- Edición del item padre -->
       <div class="item-header">
         <div class="item-title-area">
           <span id="viewTitle" class="item-title-text"></span>
@@ -93,23 +89,18 @@
         </div>
       </div>
 
-      <!-- Puntuación con estrellas -->
       <div id="ratingArea" style="display:none; margin-bottom: 1rem;">
         <div style="font-weight: bold; color: #aaa; margin-bottom: 0.3rem;">Puntuaciones:</div>
         <div id="ratingsDisplay"></div>
         <div style="margin-top: 0.5rem;">
           <span style="font-weight: bold; color: #aaa;">Tu puntuación:</span>
-          <span id="starsContainer" style="font-size: 1.8rem; cursor: pointer; margin-left: 0.5rem;">
-            ☆☆☆☆☆
-          </span>
+          <span id="starsContainer" style="font-size: 1.8rem; cursor: pointer; margin-left: 0.5rem;">☆☆☆☆☆</span>
           <span id="ratingInfo" style="font-size: 0.9rem; color: #888; margin-left: 0.5rem;"></span>
         </div>
       </div>
 
-      <!-- Lista de subitems en grid -->
       <div id="subitemsList" class="subitems-grid"></div>
 
-      <!-- Botones para añadir subitems -->
       <div class="add-subitem-buttons">
         <button id="addNoteBtn" class="sub-add-btn">📝 Nota</button>
         <button id="addLinkBtn" class="sub-add-btn">🔗 Enlace</button>
@@ -117,29 +108,11 @@
         <button id="addLocationBtn" class="sub-add-btn" style="display:none;">📍 Ubicación</button>
       </div>
 
-      <!-- Eliminar item -->
       <button id="deleteItemBtn" class="delete-btn full">Eliminar este item</button>
     </div>
   </div>
 
-  <!-- MODAL PARA RECORTE DE IMAGEN -->
-  <div id="cropModal" class="modal" style="align-items: center; background: rgba(0,0,0,0.9);">
-    <div class="modal-content" style="max-height: 90vh; border-radius: 6px; background: #1e1e1e; width: 95%; max-width: 500px;">
-      <header class="modal-header">
-        <h3>Recortar imagen</h3>
-        <button id="closeCropBtn" class="close-btn">&times;</button>
-      </header>
-      <div style="position: relative; width: 100%; display: flex; justify-content: center;">
-        <canvas id="cropCanvas" style="max-width: 100%; max-height: 60vh; background: #000; border-radius: 6px;"></canvas>
-      </div>
-      <div style="display: flex; gap: 0.5rem; margin-top: 0.8rem; justify-content: center;">
-        <button id="cropConfirmBtn" class="save-btn">Recortar y subir</button>
-        <button id="cropCancelBtn" class="cancel-btn">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL PARA AÑADIR ENLACE (INDEPENDIENTE) -->
+  <!-- MODAL PARA AÑADIR ENLACE -->
   <div id="linkModal" class="modal" style="align-items: center; background: rgba(0,0,0,0.8);">
     <div class="modal-content" style="max-height: 90vh; border-radius: 6px; background: #1e1e1e; width: 95%; max-width: 400px;">
       <header class="modal-header">
@@ -157,7 +130,7 @@
     </div>
   </div>
 
-  <!-- MODAL PARA UBICACIÓN (CON AUTOCOMPLETADO ARCGIS) -->
+  <!-- MODAL PARA UBICACIÓN -->
   <div id="locationModal" class="modal" style="align-items: center; background: rgba(0,0,0,0.8);">
     <div class="modal-content" style="max-height: 90vh; border-radius: 6px; background: #1e1e1e; width: 95%; max-width: 400px; padding: 1.2rem 1.2rem 1.5rem;">
       <header class="modal-header">
@@ -175,6 +148,12 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- MODAL VISOR DE IMAGEN A TAMAÑO COMPLETO -->
+  <div id="imageViewerModal" class="modal" style="align-items: center; background: rgba(0,0,0,0.95);">
+    <button id="closeImageViewerBtn" class="close-btn" style="position: absolute; top: 1rem; right: 1rem; color: #fff; font-size: 2rem; z-index: 101;">&times;</button>
+    <img id="imageViewerImg" src="" alt="Imagen" style="max-width: 95vw; max-height: 90vh; object-fit: contain; border-radius: 6px;">
   </div>
 
   <script src="app.js"></script>
